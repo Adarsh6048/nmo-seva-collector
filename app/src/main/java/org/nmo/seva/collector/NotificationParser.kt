@@ -28,10 +28,11 @@ object NotificationParser {
         RegexOption.IGNORE_CASE
     )
 
-    // PhonePe commonly shows incoming notifications like: "Deep sent Rs 10".
-    // The title may be prepended when Android notification fields are combined.
+    // PhonePe may render one visual sentence using multiple Android notification fields,
+    // for example title="XYZ" and text="sent Rs.1 to you". We therefore test both
+    // individual fields and adjacent fields joined with a space.
     private val personSentAmountRegex = Regex(
-        "(?:^|\\|)\\s*([^|•,\\n]+?)\\s+sent\\s+(?:₹|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)",
+        "^\\s*([^|•,\\n]+?)\\s+sent\\s+(?:₹|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)(?:\\s+to\\s+you\\b)?",
         RegexOption.IGNORE_CASE
     )
 
@@ -53,21 +54,38 @@ object NotificationParser {
     )
 
     fun parse(title: String?, text: String?, bigText: String? = null): ParsedTransaction? {
-        val combined = listOfNotNull(title, text, bigText)
-            .joinToString(" | ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-        if (combined.isBlank()) return null
+        val parts = listOfNotNull(title, text, bigText)
+            .map { normalize(it) }
+            .filter { it.isNotBlank() }
+            .distinct()
+        if (parts.isEmpty()) return null
 
+        // Besides the raw fields, create space-joined candidates because some apps split
+        // "XYZ sent Rs.1 to you" into title="XYZ" + text="sent Rs.1 to you".
+        val candidates = buildList {
+            addAll(parts)
+            if (parts.size >= 2) {
+                for (i in 0 until parts.lastIndex) add("${parts[i]} ${parts[i + 1]}")
+            }
+            add(parts.joinToString(" "))
+        }.map { normalize(it) }.distinct()
+
+        val combined = parts.joinToString(" | ")
         val lower = combined.lowercase(Locale.ENGLISH)
         if (ignoredSignals.any { lower.contains(it) }) return null
 
-        val personSentMatch = personSentAmountRegex.find(combined)
+        val personSentMatch = candidates.asSequence()
+            .mapNotNull { candidate -> personSentAmountRegex.find(candidate) }
+            .firstOrNull()
         val personSentName = personSentMatch?.groupValues?.getOrNull(1)?.trim()
-        val personSentIncoming = personSentMatch != null && !personSentName.equals("you", ignoreCase = true)
+        val personSentIncoming = personSentMatch != null &&
+            !personSentName.equals("you", ignoreCase = true)
 
-        val hasOutgoing = outgoingSignals.any { lower.contains(it) } || personSentName.equals("you", ignoreCase = true)
-        val hasIncoming = incomingSignals.any { lower.contains(it) } || personSentIncoming
+        val candidateLower = candidates.map { it.lowercase(Locale.ENGLISH) }
+        val hasOutgoing = candidateLower.any { candidate -> outgoingSignals.any { candidate.contains(it) } } ||
+            personSentName.equals("you", ignoreCase = true)
+        val hasIncoming = candidateLower.any { candidate -> incomingSignals.any { candidate.contains(it) } } ||
+            personSentIncoming
 
         val direction = when {
             hasOutgoing -> TransactionDirection.OUTGOING
@@ -78,25 +96,26 @@ object NotificationParser {
         val amount = if (personSentMatch != null) {
             personSentMatch.groupValues.getOrNull(2)?.replace(",", "")?.toDoubleOrNull()
         } else {
-            amountRegex.find(combined)?.groupValues?.getOrNull(1)
-                ?.replace(",", "")
-                ?.toDoubleOrNull()
+            candidates.asSequence()
+                .mapNotNull { amountRegex.find(it)?.groupValues?.getOrNull(1) }
+                .mapNotNull { it.replace(",", "").toDoubleOrNull() }
+                .firstOrNull()
         } ?: return null
 
         if (amount <= 0.0 || amount > 1_000_000.0) return null
 
         val ref = refRegexes.asSequence()
-            .mapNotNull { it.find(combined)?.groupValues?.getOrNull(1) }
+            .flatMap { regex -> candidates.asSequence().mapNotNull { regex.find(it)?.groupValues?.getOrNull(1) } }
             .firstOrNull()
 
         val partyHint = when {
             personSentIncoming -> personSentName?.take(80)
             direction == TransactionDirection.INCOMING -> incomingPartyPatterns.asSequence()
-                .mapNotNull { it.find(combined)?.groupValues?.getOrNull(1)?.trim() }
+                .flatMap { regex -> candidates.asSequence().mapNotNull { regex.find(it)?.groupValues?.getOrNull(1)?.trim() } }
                 .map { it.take(80) }
                 .firstOrNull()
             else -> outgoingPartyPatterns.asSequence()
-                .mapNotNull { it.find(combined)?.groupValues?.getOrNull(1)?.trim() }
+                .flatMap { regex -> candidates.asSequence().mapNotNull { regex.find(it)?.groupValues?.getOrNull(1)?.trim() } }
                 .map { it.take(80) }
                 .firstOrNull()
         }
@@ -108,4 +127,8 @@ object NotificationParser {
             transactionRef = ref
         )
     }
+
+    private fun normalize(value: String): String = value
+        .replace(Regex("\\s+"), " ")
+        .trim()
 }

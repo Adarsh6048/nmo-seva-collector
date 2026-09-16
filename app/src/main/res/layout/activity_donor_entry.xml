@@ -103,7 +103,7 @@
             android:layout_marginTop="14dp"
             android:background="@drawable/input_bg"
             android:hint="Donor name"
-            android:hintTextColor="@color/text_muted"
+            android:textColorHint="@color/text_muted"
             android:inputType="textPersonName"
             android:textColor="@color/text_primary" />
 
@@ -124,7 +124,7 @@
             android:background="@drawable/input_bg"
             android:gravity="top|start"
             android:hint="Expense comment, e.g. medicines / transport / printing"
-            android:hintTextColor="@color/text_muted"
+            android:textColorHint="@color/text_muted"
             android:inputType="textCapSentences|textMultiLine"
             android:minLines="3"
             android:textColor="@color/text_primary"

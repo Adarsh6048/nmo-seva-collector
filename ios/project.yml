@@ -27,8 +27,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.nmo.seva.ledger.share
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.share-services
-        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
-        INFOPLIST_KEY_NSExtension_NSExtensionAttributes_NSExtensionActivationRule: TRUEPREDICATE
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: NMOShareExtension/Info.plist
         CODE_SIGN_ENTITLEMENTS: NMOShareExtension/NMOShareExtension.entitlements

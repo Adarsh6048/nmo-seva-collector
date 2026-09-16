@@ -5,12 +5,16 @@ const SHEETS = {
   EXPENSES: 'Expenses'
 };
 
+const PAYMENT_HEADERS = [
+  'Event ID','Transaction At','Server Updated At','Collector Code','Collector Name',
+  'Amount','Donor Name','Counterparty Hint','UPI Ref','Source App','Reconciled',
+  'Direction','Donation Status'
+];
+
 function setupSheets() {
   const ss = SpreadsheetApp.getActive();
-  ensureSheet_(ss, SHEETS.PAYMENTS, [
-    'Event ID','Received At','Server Updated At','Collector Code','Collector Name',
-    'Amount','Donor Name','Sender Hint','UPI Ref','Source App','Reconciled'
-  ]);
+  const payments = ensureSheet_(ss, SHEETS.PAYMENTS, PAYMENT_HEADERS);
+  ensurePaymentSchema_(payments);
   ensureSheet_(ss, SHEETS.COLLECTORS, ['Collector Code','Collector Name','Token','Active']);
   ensureSheet_(ss, SHEETS.SETTINGS, ['Key','Value']);
   ensureSheet_(ss, SHEETS.EXPENSES, ['Expense ID','Date','Category','Vendor','Amount','Remarks','Added By']);
@@ -20,7 +24,7 @@ function setupSheets() {
   if (!data.some(r => r[0] === 'TARGET')) settings.appendRow(['TARGET', 400000]);
   if (!data.some(r => r[0] === 'CAMPAIGN')) settings.appendRow(['CAMPAIGN', 'Dr. B. R. Ambedkar Swasthya Sewa Yatra — 100 Health Camps, Kanpur']);
   SpreadsheetApp.flush();
-  return 'Sheets created. Next: run setAdminPin("your-pin") and addCollector("NMO01","Name").';
+  return 'Sheets ready. Existing payment rows were migrated to the transaction + donation schema.';
 }
 
 function setAdminPin(pin) {
@@ -64,6 +68,7 @@ function doPost(e) {
     if (events.length > 100) throw new Error('Maximum 100 events per request.');
 
     const sh = SpreadsheetApp.getActive().getSheetByName(SHEETS.PAYMENTS);
+    ensurePaymentSchema_(sh);
     const existing = sh.getLastRow() > 1
       ? sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().flat().map(String)
       : [];
@@ -74,12 +79,19 @@ function doPost(e) {
     events.forEach(ev => {
       const eventId = clean_(ev.eventId, 100);
       const amount = Number(ev.amount);
-      const receivedAt = Number(ev.receivedAt);
-      if (!eventId || !Number.isFinite(amount) || amount <= 0 || amount > 1000000 || !Number.isFinite(receivedAt)) return;
+      const transactionAt = Number(ev.receivedAt);
+      if (!eventId || !Number.isFinite(amount) || amount <= 0 || amount > 1000000 || !Number.isFinite(transactionAt)) return;
+
+      let direction = String(ev.direction || 'INCOMING').toUpperCase();
+      if (!['INCOMING','OUTGOING'].includes(direction)) direction = 'INCOMING';
+
+      let donationStatus = String(ev.donationStatus || 'PENDING').toUpperCase();
+      if (!['PENDING','DONATION','NOT_DONATION'].includes(donationStatus)) donationStatus = 'PENDING';
+      if (direction === 'OUTGOING') donationStatus = 'NOT_DONATION';
 
       const row = [
         eventId,
-        new Date(receivedAt),
+        new Date(transactionAt),
         now,
         collector.code,
         collector.name,
@@ -88,7 +100,9 @@ function doPost(e) {
         clean_(ev.senderHint, 120),
         clean_(ev.transactionRef, 80),
         clean_(ev.sourceApp, 80),
-        Boolean(ev.reconciled)
+        Boolean(ev.reconciled),
+        direction,
+        donationStatus
       ];
       const existingRow = rowById.get(eventId);
       if (existingRow) {
@@ -116,40 +130,69 @@ function getDashboard(pin) {
   if (!expected || String(pin) !== expected) throw new Error('Invalid admin PIN.');
 
   const ss = SpreadsheetApp.getActive();
-  const payments = ss.getSheetByName(SHEETS.PAYMENTS).getDataRange().getValues();
+  const sh = ss.getSheetByName(SHEETS.PAYMENTS);
+  ensurePaymentSchema_(sh);
+  const payments = sh.getDataRange().getValues();
   const target = Number(getSetting_('TARGET') || 400000);
   const campaign = String(getSetting_('CAMPAIGN') || 'Dr. B. R. Ambedkar Swasthya Sewa Yatra — 100 Health Camps, Kanpur');
 
-  let total = 0, reconciled = 0, pendingNames = 0;
+  let donationTotal = 0;
+  let reconciledDonations = 0;
+  let incomingCount = 0;
+  let outgoingCount = 0;
+  let pendingReviews = 0;
   const byCollector = {};
   const recent = [];
+
   for (let i = 1; i < payments.length; i++) {
     const r = payments[i];
     const amount = Number(r[5]) || 0;
-    total += amount;
-    if (r[10] === true) reconciled += amount;
-    if (!String(r[6] || '').trim()) pendingNames++;
+    const direction = String(r[11] || 'INCOMING').toUpperCase();
+    const donationStatus = String(r[12] || 'PENDING').toUpperCase();
+    const isDonation = direction === 'INCOMING' && donationStatus === 'DONATION';
+
+    if (direction === 'INCOMING') incomingCount++; else if (direction === 'OUTGOING') outgoingCount++;
+    if (direction === 'INCOMING' && donationStatus === 'PENDING') pendingReviews++;
+    if (isDonation) {
+      donationTotal += amount;
+      if (r[10] === true) reconciledDonations += amount;
+    }
+
     const code = String(r[3] || 'UNKNOWN');
     const name = String(r[4] || code);
-    if (!byCollector[code]) byCollector[code] = {code, name, amount: 0, count: 0};
-    byCollector[code].amount += amount;
-    byCollector[code].count++;
+    if (!byCollector[code]) byCollector[code] = {code, name, donationAmount: 0, donationCount: 0, transactionCount: 0};
+    byCollector[code].transactionCount++;
+    if (isDonation) {
+      byCollector[code].donationAmount += amount;
+      byCollector[code].donationCount++;
+    }
+
     recent.push({
-      receivedAt: r[1] instanceof Date ? r[1].toISOString() : String(r[1]),
+      transactionAt: r[1] instanceof Date ? r[1].toISOString() : String(r[1]),
       collector: code,
       amount,
-      donor: String(r[6] || 'Name pending'),
+      donor: String(r[6] || ''),
+      party: String(r[7] || ''),
       source: String(r[9] || ''),
-      reconciled: r[10] === true
+      reconciled: r[10] === true,
+      direction,
+      donationStatus
     });
   }
-  recent.sort((a,b) => new Date(b.receivedAt) - new Date(a.receivedAt));
+
+  recent.sort((a,b) => new Date(b.transactionAt) - new Date(a.transactionAt));
   return {
-    campaign, target, total, reconciled, pendingNames,
-    remaining: Math.max(0, target - total),
-    count: Math.max(0, payments.length - 1),
-    byCollector: Object.values(byCollector).sort((a,b) => b.amount - a.amount),
-    recent: recent.slice(0, 40)
+    campaign,
+    target,
+    donationTotal,
+    reconciledDonations,
+    incomingCount,
+    outgoingCount,
+    pendingReviews,
+    transactionCount: Math.max(0, payments.length - 1),
+    remaining: Math.max(0, target - donationTotal),
+    byCollector: Object.values(byCollector).sort((a,b) => b.donationAmount - a.donationAmount),
+    recent: recent.slice(0, 60)
   };
 }
 
@@ -174,9 +217,34 @@ function validateCollector_(code, token) {
   throw new Error('Collector credentials rejected.');
 }
 
+function ensurePaymentSchema_(sh) {
+  if (!sh) throw new Error('Payments sheet missing. Run setupSheets().');
+  if (sh.getMaxColumns() < PAYMENT_HEADERS.length) {
+    sh.insertColumnsAfter(sh.getMaxColumns(), PAYMENT_HEADERS.length - sh.getMaxColumns());
+  }
+  sh.getRange(1, 1, 1, PAYMENT_HEADERS.length).setValues([PAYMENT_HEADERS]);
+  sh.getRange(1, 1, 1, PAYMENT_HEADERS.length).setFontWeight('bold');
+  sh.setFrozenRows(1);
+
+  const lastRow = sh.getLastRow();
+  if (lastRow > 1) {
+    const rows = sh.getRange(2, 1, lastRow - 1, PAYMENT_HEADERS.length).getValues();
+    let changed = false;
+    rows.forEach(r => {
+      if (!String(r[11] || '').trim()) { r[11] = 'INCOMING'; changed = true; }
+      if (!String(r[12] || '').trim()) {
+        r[12] = String(r[6] || '').trim() ? 'DONATION' : 'PENDING';
+        changed = true;
+      }
+    });
+    if (changed) sh.getRange(2, 1, rows.length, PAYMENT_HEADERS.length).setValues(rows);
+  }
+}
+
 function ensureSheet_(ss, name, headers) {
   let sh = ss.getSheetByName(name);
   if (!sh) sh = ss.insertSheet(name);
+  if (sh.getMaxColumns() < headers.length) sh.insertColumnsAfter(sh.getMaxColumns(), headers.length - sh.getMaxColumns());
   if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers]);
     sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');

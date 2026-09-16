@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 final class SettingsStore: ObservableObject {
     @Published var collectorName: String { didSet { save() } }

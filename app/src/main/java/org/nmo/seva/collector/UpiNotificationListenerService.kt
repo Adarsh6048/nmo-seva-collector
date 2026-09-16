@@ -18,7 +18,9 @@ class UpiNotificationListenerService : NotificationListenerService() {
         "com.google.android.apps.nbu.paisa.user" to "Google Pay",
         "com.phonepe.app" to "PhonePe",
         "net.one97.paytm" to "Paytm",
-        "in.org.npci.upiapp" to "BHIM"
+        "in.org.npci.upiapp" to "BHIM",
+        "com.whatsapp" to "WhatsApp Pay",
+        "com.whatsapp.w4b" to "WhatsApp Business Pay"
     )
 
     override fun onCreate() {
@@ -50,7 +52,7 @@ class UpiNotificationListenerService : NotificationListenerService() {
         }.filter { it.isNotBlank() }.distinct()
 
         val extraText = extraParts.takeIf { it.isNotEmpty() }?.joinToString(" | ")
-        val parsed = NotificationParser.parse(title, text, extraText) ?: return
+        val parsed = NotificationParser.parse(title, text, extraText, sbn.packageName) ?: return
 
         val eventId = sha256("${sbn.packageName}|${sbn.key}|${sbn.postTime}|${parsed.direction}|${parsed.amount}")
         val donationStatus = if (parsed.direction == TransactionDirection.INCOMING) {

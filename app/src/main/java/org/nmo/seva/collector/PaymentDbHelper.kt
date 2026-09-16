@@ -31,10 +31,12 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE payments ADD COLUMN direction TEXT NOT NULL DEFAULT 'INCOMING'")
             db.execSQL("ALTER TABLE payments ADD COLUMN donation_status TEXT NOT NULL DEFAULT 'PENDING'")
+            db.execSQL("UPDATE payments SET donation_status = 'DONATION' WHERE donor_name IS NOT NULL AND TRIM(donor_name) <> ''")
         }
         if (oldVersion < 3) {
             db.execSQL("ALTER TABLE payments ADD COLUMN uploaded_once INTEGER NOT NULL DEFAULT 0")
-            db.execSQL("UPDATE payments SET uploaded_once = CASE WHEN synced = 1 THEN 1 ELSE 0 END")
+            db.execSQL("UPDATE payments SET uploaded_once = CASE WHEN synced = 1 AND donation_status = 'DONATION' THEN 1 ELSE 0 END")
+            db.execSQL("UPDATE payments SET synced = 1 WHERE donation_status <> 'DONATION' AND uploaded_once = 0")
         }
     }
 

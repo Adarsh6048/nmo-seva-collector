@@ -1,22 +1,26 @@
 # Setup guide
 
-## A. Create the central Google Sheet
+## A. Create or update the central Google Sheet
 
-1. Create a new Google Sheet, for example **NMO Seva Payments**.
+1. Open the Google Sheet used by the campaign.
 2. Open **Extensions → Apps Script**.
-3. Replace the default code with `backend/apps-script/Code.gs`.
-4. Add a new HTML file named exactly `Dashboard` and paste `backend/apps-script/Dashboard.html`.
-5. Save the project.
-
-### Initialize the database
-
-Run once from Apps Script:
+3. Replace `Code.gs` with the latest `backend/apps-script/Code.gs` from this repository.
+4. Replace the HTML file named exactly `Dashboard` with the latest `backend/apps-script/Dashboard.html`.
+5. Save the Apps Script project.
+6. Run:
 
 ```javascript
 setupSheets()
 ```
 
-It creates:
+`setupSheets()` is safe to run again after upgrading. It keeps existing rows and upgrades the `Payments` sheet to include:
+
+- Direction
+- Donation Status
+
+Existing old payment rows are migrated as incoming transactions; rows that already have a donor name are treated as donations, while unnamed old rows remain pending review.
+
+The workbook contains:
 
 - `Payments`
 - `Collectors`
@@ -25,92 +29,97 @@ It creates:
 
 The default campaign target is **₹4,00,000**.
 
-### Set an admin dashboard PIN
+## B. Admin PIN and collectors
 
-Run once, replacing the example:
+If not already configured, set an admin PIN using a helper function or your existing setup method.
 
-```javascript
-setAdminPin("choose-a-strong-pin")
-```
+Collector credentials remain unchanged after this upgrade. You do **not** need to create a new collector token merely because the app was updated.
 
-### Add collectors
-
-For each collector, run:
+For a new collector:
 
 ```javascript
-addCollector("NMO01", "Collector Name")
+addCollector("NMO02", "Collector Name")
 ```
 
-The function returns a long random `token`. Copy the collector **code + token** somewhere secure and give only that pair to the relevant collector.
+Keep the returned token private.
 
-Repeat, for example:
+## C. Redeploy Apps Script after code changes
 
-```javascript
-addCollector("NMO02", "Collector Two")
-addCollector("NMO03", "Collector Three")
-```
+After replacing `Code.gs` and `Dashboard.html`:
 
-You can deactivate a collector later:
+1. Click **Deploy → Manage deployments**.
+2. Edit the current Web app deployment.
+3. Choose **New version**.
+4. Deploy.
+5. Keep using the `/exec` URL from the active deployment.
 
-```javascript
-setCollectorActive("NMO03", false)
-```
+If you instead create a completely new deployment, update the backend URL inside every collector app.
 
-## B. Deploy the Apps Script backend
+## D. Update the Android app
 
-1. In Apps Script choose **Deploy → New deployment**.
-2. Select **Web app**.
-3. Execute as: **Me**.
-4. Access: choose the setting that allows the collector apps to reach the endpoint. For a personal Google account this is typically **Anyone**.
-5. Deploy and copy the URL ending in `/exec`.
+1. In Android Studio choose **Git → Pull**.
+2. Wait for Gradle sync.
+3. Run the app on the phone again to install the latest build over the existing app.
+4. Existing collector settings and the local SQLite database remain on the phone when installing an update normally.
+5. Confirm **Notification access** is still enabled.
 
-The endpoint does not expose the Sheet directly. Collector uploads are accepted only when `collectorCode + token` match an active row in the `Collectors` sheet.
+The local database automatically upgrades from version 1 to version 2 and adds:
 
-The same `/exec` URL opens the admin dashboard in a browser. It asks for the PIN set with `setAdminPin()`.
+- `direction`
+- `donation_status`
 
-## C. Install/configure each Android collector app
+## E. New transaction workflow
 
-1. Build/install the APK on the collector's Android phone.
-2. On first launch enter:
-   - Collector name
-   - Collector code, e.g. `NMO01`
-   - Collector token returned by Apps Script
-   - `/exec` backend URL
-3. Tap **Enable notification access** and enable **NMO Seva Collector**.
-4. Allow normal app notifications when Android asks. This permission is needed for the **“add donor name”** prompt.
-5. Keep Google Pay / PhonePe / Paytm / BHIM notifications enabled.
+For supported UPI notifications:
 
-## D. Test before fundraising
+### Incoming
 
-Do a small real transfer between team members, e.g. ₹1 or ₹10.
+1. Transaction is saved as `INCOMING` + `PENDING`.
+2. Collector receives a prompt to review it.
+3. Collector chooses:
+   - **Mark as donation** → donor name / Anonymous required
+   - **Not a donation**
+   - **Decide later**
+4. Only **Mark as donation** contributes to the campaign fundraising total.
 
-Expected sequence:
+### Outgoing
 
-1. UPI app posts an incoming-payment notification.
-2. NMO Seva Collector posts its own high-priority notification.
-3. Tap it and enter the donor name.
-4. Open the app: the payment should be visible.
-5. Open the Apps Script `/exec` dashboard: the payment should appear after sync.
-6. Check the Google Sheet `Payments` tab.
+1. Transaction is saved as `OUTGOING`.
+2. It is automatically `NOT_DONATION`.
+3. It remains visible in the transaction ledger for accountability.
+4. It never increases the fundraising total.
 
-Test each UPI app your collectors actually use. Notification text differs by app/version; if one format is not detected, capture the exact notification wording **without sharing sensitive bank details** and add a parser rule.
+## F. Test before fundraising
 
-## E. Reconciliation
+Use small real transactions such as ₹1 or ₹10.
 
-Notification detection should be considered **Auto-detected**, not final bank verification.
+Test both directions if possible:
+
+1. Receive money into the collector's UPI account.
+2. Confirm the app shows the incoming transaction and asks whether it is a donation.
+3. Mark one test as **Donation** and another as **Not a donation**.
+4. Send a small outgoing payment and confirm it appears under recent transactions as outgoing.
+5. Open the Apps Script dashboard and verify only the transaction marked **Donation** is added to fundraising progress.
+6. Check the `Payments` sheet for `Direction` and `Donation Status`.
+
+Notification wording differs by UPI app/version. If a real transaction is missed, capture only the notification wording needed for parser debugging and hide sensitive bank details.
+
+## G. Reconciliation
+
+Notification detection is not final bank verification.
 
 At the end of a shift/day:
 
 1. Collector opens their UPI/bank history.
-2. Compare amounts/times/reference numbers with the Sheet.
-3. In the `Payments` sheet set the `Reconciled` column to `TRUE` for confirmed entries.
-4. The dashboard will show both **Detected total** and **Reconciled total**.
+2. Compare amount, time and available reference number with the `Payments` sheet.
+3. Set `Reconciled` to `TRUE` for confirmed rows.
+4. The dashboard separately displays reconciled donation value.
 
-## F. Changing the campaign target/name
+## H. Campaign settings
 
 In the `Settings` sheet:
 
 - `TARGET` → `400000`
-- `CAMPAIGN` → your preferred campaign name
+- `CAMPAIGN` → campaign display name
 
 The dashboard reads these values automatically.

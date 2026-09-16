@@ -27,6 +27,9 @@ class UpiNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        val prefs = AppPreferences(applicationContext)
+        if (!prefs.ledgerConsent) return
+
         val sourceName = supportedPackages[sbn.packageName] ?: return
         val n = sbn.notification ?: return
         val extras = n.extras
@@ -75,7 +78,6 @@ class UpiNotificationListenerService : NotificationListenerService() {
                 donationStatus = donationStatus,
                 expenseStatus = expenseStatus,
                 expenseNote = null,
-                // Every detected transaction is queued for the transparent central ledger.
                 synced = false,
                 reconciled = false
             )

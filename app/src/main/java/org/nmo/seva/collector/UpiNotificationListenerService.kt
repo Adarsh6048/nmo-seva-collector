@@ -30,10 +30,26 @@ class UpiNotificationListenerService : NotificationListenerService() {
         val sourceName = supportedPackages[sbn.packageName] ?: return
         val n = sbn.notification ?: return
         val extras = n.extras
+
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
-        val parsed = NotificationParser.parse(title, text, bigText) ?: return
+
+        // Some UPI apps (including PhonePe versions) spread one visible message across
+        // title/text/subtext/expanded-text fields. Collect the useful visible fields so
+        // the parser can reconstruct messages such as "XYZ sent Rs.1 to you".
+        val extraParts = buildList<String> {
+            extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.let(::add)
+            extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.let(::add)
+            extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString()?.let(::add)
+            extras.getCharSequence(Notification.EXTRA_INFO_TEXT)?.toString()?.let(::add)
+            extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+                ?.map { it.toString() }
+                ?.forEach(::add)
+            n.tickerText?.toString()?.let(::add)
+        }.filter { it.isNotBlank() }.distinct()
+
+        val extraText = extraParts.takeIf { it.isNotEmpty() }?.joinToString(" | ")
+        val parsed = NotificationParser.parse(title, text, extraText) ?: return
 
         val eventId = sha256("${sbn.packageName}|${sbn.key}|${sbn.postTime}|${parsed.direction}|${parsed.amount}")
         val donationStatus = if (parsed.direction == TransactionDirection.INCOMING) {

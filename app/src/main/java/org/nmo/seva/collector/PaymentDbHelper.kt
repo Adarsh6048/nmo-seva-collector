@@ -5,7 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payments.db", null, 3) {
+class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payments.db", null, 4) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """
@@ -19,7 +19,9 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
                 source_app TEXT NOT NULL,
                 direction TEXT NOT NULL DEFAULT 'INCOMING',
                 donation_status TEXT NOT NULL DEFAULT 'PENDING',
-                synced INTEGER NOT NULL DEFAULT 1,
+                expense_status TEXT NOT NULL DEFAULT 'NOT_APPLICABLE',
+                expense_note TEXT,
+                synced INTEGER NOT NULL DEFAULT 0,
                 reconciled INTEGER NOT NULL DEFAULT 0,
                 uploaded_once INTEGER NOT NULL DEFAULT 0
             )
@@ -36,7 +38,15 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
         if (oldVersion < 3) {
             db.execSQL("ALTER TABLE payments ADD COLUMN uploaded_once INTEGER NOT NULL DEFAULT 0")
             db.execSQL("UPDATE payments SET uploaded_once = CASE WHEN synced = 1 AND donation_status = 'DONATION' THEN 1 ELSE 0 END")
-            db.execSQL("UPDATE payments SET synced = 1 WHERE donation_status <> 'DONATION' AND uploaded_once = 0")
+        }
+        if (oldVersion < 4) {
+            db.execSQL("ALTER TABLE payments ADD COLUMN expense_status TEXT NOT NULL DEFAULT 'NOT_APPLICABLE'")
+            db.execSQL("ALTER TABLE payments ADD COLUMN expense_note TEXT")
+            db.execSQL("UPDATE payments SET expense_status = 'PENDING' WHERE direction = 'OUTGOING'")
+            db.execSQL("UPDATE payments SET expense_status = 'NOT_APPLICABLE' WHERE direction = 'INCOMING'")
+            // The central ledger now receives all supported UPI transaction metadata.
+            // Queue historic local records so the ledger becomes complete after upgrade.
+            db.execSQL("UPDATE payments SET synced = 0")
         }
     }
 
@@ -51,6 +61,8 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
             put("source_app", payment.sourceApp)
             put("direction", payment.direction.name)
             put("donation_status", payment.donationStatus.name)
+            put("expense_status", payment.expenseStatus.name)
+            put("expense_note", payment.expenseNote)
             put("synced", if (payment.synced) 1 else 0)
             put("reconciled", if (payment.reconciled) 1 else 0)
             put("uploaded_once", 0)
@@ -59,19 +71,19 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
     }
 
     fun updateClassification(eventId: String, status: DonationStatus, donorName: String? = null) {
-        val uploadedOnce = readableDatabase.rawQuery(
-            "SELECT uploaded_once FROM payments WHERE event_id = ?", arrayOf(eventId)
-        ).use { c -> c.moveToFirst() && c.getInt(0) == 1 }
-
         val values = ContentValues().apply {
             put("donation_status", status.name)
-            if (status == DonationStatus.DONATION) put("donor_name", donorName?.trim())
-            else putNull("donor_name")
+            if (status == DonationStatus.DONATION) put("donor_name", donorName?.trim()) else putNull("donor_name")
+            put("synced", 0)
+        }
+        writableDatabase.update("payments", values, "event_id = ?", arrayOf(eventId))
+    }
 
-            // Personal/non-donation transactions stay local. If a donation was already
-            // uploaded and is later reclassified, sync the reclassification once.
-            val needsServerUpdate = status == DonationStatus.DONATION || uploadedOnce
-            put("synced", if (needsServerUpdate) 0 else 1)
+    fun updateExpenseClassification(eventId: String, status: ExpenseStatus, note: String? = null) {
+        val values = ContentValues().apply {
+            put("expense_status", status.name)
+            if (status == ExpenseStatus.CAMPAIGN_EXPENSE) put("expense_note", note?.trim()) else putNull("expense_note")
+            put("synced", 0)
         }
         writableDatabase.update("payments", values, "event_id = ?", arrayOf(eventId))
     }
@@ -115,13 +127,22 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
         "SELECT * FROM payments ORDER BY received_at DESC LIMIT ?", arrayOf(limit.toString())
     ).use { c -> buildList { while (c.moveToNext()) add(read(c)) } }
 
-    fun getPendingClassification(limit: Int = 20): List<Payment> = readableDatabase.rawQuery(
-        "SELECT * FROM payments WHERE direction = 'INCOMING' AND donation_status = 'PENDING' ORDER BY received_at DESC LIMIT ?",
+    fun getPendingReview(limit: Int = 30): List<Payment> = readableDatabase.rawQuery(
+        """
+        SELECT * FROM payments
+        WHERE (direction = 'INCOMING' AND donation_status = 'PENDING')
+           OR (direction = 'OUTGOING' AND expense_status = 'PENDING')
+        ORDER BY received_at DESC LIMIT ?
+        """.trimIndent(),
         arrayOf(limit.toString())
     ).use { c -> buildList { while (c.moveToNext()) add(read(c)) } }
 
     fun donationTotal(): Double = readableDatabase.rawQuery(
         "SELECT COALESCE(SUM(amount),0) FROM payments WHERE direction = 'INCOMING' AND donation_status = 'DONATION'", null
+    ).use { c -> if (c.moveToFirst()) c.getDouble(0) else 0.0 }
+
+    fun campaignExpenseTotal(): Double = readableDatabase.rawQuery(
+        "SELECT COALESCE(SUM(amount),0) FROM payments WHERE direction = 'OUTGOING' AND expense_status = 'CAMPAIGN_EXPENSE'", null
     ).use { c -> if (c.moveToFirst()) c.getDouble(0) else 0.0 }
 
     fun transactionCount(): Int = readableDatabase.rawQuery(
@@ -142,6 +163,8 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
         sourceApp = c.getString(c.getColumnIndexOrThrow("source_app")),
         direction = runCatching { TransactionDirection.valueOf(c.getString(c.getColumnIndexOrThrow("direction"))) }.getOrDefault(TransactionDirection.INCOMING),
         donationStatus = runCatching { DonationStatus.valueOf(c.getString(c.getColumnIndexOrThrow("donation_status"))) }.getOrDefault(DonationStatus.PENDING),
+        expenseStatus = runCatching { ExpenseStatus.valueOf(c.getString(c.getColumnIndexOrThrow("expense_status"))) }.getOrDefault(ExpenseStatus.NOT_APPLICABLE),
+        expenseNote = c.getString(c.getColumnIndexOrThrow("expense_note")),
         synced = c.getInt(c.getColumnIndexOrThrow("synced")) == 1,
         reconciled = c.getInt(c.getColumnIndexOrThrow("reconciled")) == 1
     )

@@ -17,12 +17,16 @@ class DonorEntryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityDonorEntryBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        LogoAsset.applyTo(binding.logoImage)
+
         db = PaymentDbHelper(this)
         eventId = intent.getStringExtra("event_id") ?: run { finish(); return }
         val payment = db.getPayment(eventId) ?: run { finish(); return }
 
         binding.amountText.text = if (payment.amount % 1.0 == 0.0) "₹${payment.amount.toLong()}" else "₹%.2f".format(payment.amount)
-        binding.directionText.text = if (payment.direction == TransactionDirection.INCOMING) "Incoming transaction" else "Outgoing transaction"
+        binding.amountText.setTextColor(getColor(if (payment.direction == TransactionDirection.INCOMING) R.color.success else R.color.expense))
+        binding.directionText.text = if (payment.direction == TransactionDirection.INCOMING) "INCOMING" else "OUTGOING"
+        binding.directionText.setTextColor(getColor(if (payment.direction == TransactionDirection.INCOMING) R.color.success else R.color.expense))
         binding.sourceText.text = buildString {
             append(payment.sourceApp)
             payment.senderHint?.takeIf { it.isNotBlank() }?.let { append(" • party: $it") }

@@ -4,65 +4,196 @@
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    :root { --p:#0b6b4f; --bg:#f5f7f6; --text:#12211b; --muted:#65746d; --card:#fff; --warn:#b54708; --red:#b42318; }
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
-    .wrap{max-width:1120px;margin:0 auto;padding:24px}.top{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
-    h1{margin:0;font-size:28px}.muted{color:var(--muted)} .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
-    .card{background:var(--card);border-radius:18px;padding:18px;box-shadow:0 1px 4px #00000010}.big{font-size:28px;font-weight:750;margin-top:5px}
-    .progress{height:16px;background:#e6ebe8;border-radius:999px;overflow:hidden}.bar{height:100%;background:var(--p);width:0}.row{display:flex;justify-content:space-between;gap:12px;margin-top:8px}
-    table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:11px;border-bottom:1px solid #edf0ee;vertical-align:top} th{font-size:12px;color:var(--muted);text-transform:uppercase}
-    input,button{font:inherit;padding:11px 13px;border-radius:10px;border:1px solid #d8dfdb}button{background:var(--p);color:#fff;border:0;cursor:pointer}.login{max-width:420px;margin:12vh auto}
-    .hide{display:none}.pill{display:inline-block;border-radius:999px;padding:3px 8px;background:#edf7f2;color:var(--p);font-size:12px}.pill.retracted{background:#fef3f2;color:var(--red)}.warn{color:var(--warn)}
-    @media(max-width:760px){.grid{grid-template-columns:1fr 1fr}.wrap{padding:16px} table{font-size:13px}.scroll{overflow:auto}}
+    :root{--p:#0b6b4f;--bg:#f5f7f6;--text:#12211b;--muted:#65746d;--card:#fff;--warn:#b54708;--red:#b42318;--blue:#175cd3;--line:#e6ebe8}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
+    .wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;gap:14px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+    h1{margin:0;font-size:28px}h2{margin:0 0 14px;font-size:20px}.muted{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:20px 0}.card{background:var(--card);border-radius:18px;padding:18px;box-shadow:0 1px 4px #00000010}.big{font-size:26px;font-weight:750;margin-top:5px;word-break:break-word}
+    .progress{height:16px;background:#e6ebe8;border-radius:999px;overflow:hidden}.bar{height:100%;background:var(--p);width:0}.row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 11px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}th{font-size:11px;color:var(--muted);text-transform:uppercase;position:sticky;top:0;background:#fff;z-index:1}
+    input,select,button{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #d8dfdb;background:#fff;color:var(--text)}button{background:var(--p);color:#fff;border:0;cursor:pointer}.login{max-width:420px;margin:12vh auto}
+    .hide{display:none}.scroll{overflow:auto;max-height:560px}.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.filters input{min-width:220px;flex:1}.filters select{min-width:150px}
+    .pill{display:inline-block;border-radius:999px;padding:3px 8px;font-size:12px;font-weight:650}.donation{background:#edf7f2;color:var(--p)}.expense{background:#fff4e8;color:var(--warn)}.pending{background:#eef4ff;color:var(--blue)}.personal{background:#f2f4f7;color:#475467}.out{color:var(--red)}.in{color:var(--p)}.warn{color:var(--warn)}
+    .note{max-width:300px;white-space:normal}.subgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+    @media(max-width:1000px){.grid{grid-template-columns:repeat(3,1fr)}.subgrid{grid-template-columns:1fr}}
+    @media(max-width:680px){.grid{grid-template-columns:1fr 1fr}.wrap{padding:14px}.big{font-size:22px}.filters>*{width:100%;min-width:0}.scroll{max-height:none}}
   </style>
 </head>
 <body>
   <div id="login" class="wrap login card">
-    <h1>NMO Seva Dashboard</h1><p class="muted">Enter the admin PIN configured in Apps Script.</p>
-    <div style="display:flex;gap:8px"><input id="pin" type="password" placeholder="Admin PIN" style="flex:1"><button onclick="load()">Open</button></div>
+    <h1>NMO Seva Dashboard</h1>
+    <p class="muted">Enter the admin PIN configured in Apps Script.</p>
+    <div style="display:flex;gap:8px"><input id="pin" type="password" placeholder="Admin PIN" style="flex:1"><button id="openButton">Open</button></div>
     <p id="err" class="warn"></p>
   </div>
+
   <main id="app" class="wrap hide">
-    <div class="top"><div><h1 id="campaign">Campaign</h1><div class="muted">Only transactions selected by collectors as donations are uploaded. Personal transactions stay on the collector phone.</div></div><button onclick="load()">Refresh</button></div>
-    <div class="grid">
-      <div class="card"><div class="muted">Donation total</div><div id="donationTotal" class="big">₹0</div></div>
-      <div class="card"><div class="muted">Donations</div><div id="donationCount" class="big">0</div></div>
-      <div class="card"><div class="muted">Reconciled donations</div><div id="reconciled" class="big">₹0</div></div>
-      <div class="card"><div class="muted">Reclassified records</div><div id="reclassifiedCount" class="big">0</div></div>
+    <div class="top">
+      <div><h1 id="campaign">Campaign</h1><div class="muted">Collector-wise campaign report and UPI transaction ledger</div></div>
+      <button id="refreshButton">Refresh</button>
     </div>
+
+    <div class="grid">
+      <div class="card"><div class="muted">Donations</div><div id="donationTotal" class="big">₹0</div><div id="donationCount" class="muted">0 entries</div></div>
+      <div class="card"><div class="muted">Campaign expenses</div><div id="expenseTotal" class="big">₹0</div><div id="expenseCount" class="muted">0 entries</div></div>
+      <div class="card"><div class="muted">Net campaign balance</div><div id="netCampaign" class="big">₹0</div></div>
+      <div class="card"><div class="muted">Ledger entries</div><div id="ledgerCount" class="big">0</div></div>
+      <div class="card"><div class="muted">Incoming review pending</div><div id="pendingIncoming" class="big">0</div></div>
+      <div class="card"><div class="muted">Expense review pending</div><div id="pendingExpenses" class="big">0</div></div>
+    </div>
+
     <section class="card">
       <div class="row"><strong>Fundraising progress</strong><span id="progressText"></span></div>
       <div class="progress" style="margin-top:12px"><div id="bar" class="bar"></div></div>
+      <div class="muted" style="margin-top:8px">Progress is based on transactions classified as donations. Campaign expenses are shown separately.</div>
     </section>
-    <section class="card" style="margin-top:14px"><h2>Collectors</h2><div class="scroll"><table><thead><tr><th>Collector</th><th>Campaign records</th><th>Donations</th><th>Donation amount</th></tr></thead><tbody id="collectors"></tbody></table></div></section>
-    <section class="card" style="margin-top:14px"><h2>Recent campaign records</h2><div class="scroll"><table><thead><tr><th>Time</th><th>Collector</th><th>Donor</th><th>Amount</th><th>Status</th></tr></thead><tbody id="recent"></tbody></table></div></section>
+
+    <div class="subgrid">
+      <section class="card">
+        <h2>Collector-wise report</h2>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Collector</th><th>Transactions</th><th>Incoming</th><th>Outgoing</th><th>Donations</th><th>Expenses</th><th>Net campaign</th><th>Pending</th></tr></thead>
+            <tbody id="collectors"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Overall movement</h2>
+        <table>
+          <tbody>
+            <tr><td class="muted">All detected incoming</td><td id="incomingTotal" style="text-align:right;font-weight:700">₹0</td></tr>
+            <tr><td class="muted">All detected outgoing</td><td id="outgoingTotal" style="text-align:right;font-weight:700">₹0</td></tr>
+            <tr><td class="muted">Reconciled donations</td><td id="reconciled" style="text-align:right;font-weight:700">₹0</td></tr>
+            <tr><td class="muted">Target remaining</td><td id="remaining" style="text-align:right;font-weight:700">₹0</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:14px">
+      <div class="row"><h2 style="margin:0">Transaction ledger</h2><span id="visibleCount" class="muted"></span></div>
+      <div class="filters">
+        <select id="collectorFilter"><option value="">All collectors</option></select>
+        <select id="directionFilter"><option value="">Incoming + outgoing</option><option value="INCOMING">Incoming</option><option value="OUTGOING">Outgoing</option></select>
+        <select id="classFilter"><option value="">All classifications</option><option value="DONATION">Donation</option><option value="CAMPAIGN_EXPENSE">Campaign expense</option><option value="PENDING">Pending review</option><option value="PERSONAL">Personal / non-campaign</option></select>
+        <input id="searchFilter" placeholder="Search donor, expense comment, party, ref…">
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Time</th><th>Collector</th><th>Direction</th><th>Amount</th><th>Classification</th><th>Donor / expense comment</th><th>Counterparty</th><th>Source</th><th>Ref</th></tr></thead>
+          <tbody id="ledger"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
+
 <script>
-  let currentPin = '';
-  const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n||0);
+  let currentPin='';
+  let dashboardData=null;
+  const $=id=>document.getElementById(id);
+  const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(Number(n)||0);
+
   function load(){
-    currentPin = document.getElementById('pin').value || currentPin;
-    document.getElementById('err').textContent='';
-    google.script.run.withSuccessHandler(render).withFailureHandler(e=>document.getElementById('err').textContent=e.message||e).getDashboard(currentPin);
+    currentPin=$('pin').value||currentPin;
+    $('err').textContent='';
+    google.script.run.withSuccessHandler(render).withFailureHandler(e=>$('err').textContent=e.message||e).getDashboard(currentPin);
   }
+
   function render(d){
-    document.getElementById('login').classList.add('hide'); document.getElementById('app').classList.remove('hide');
-    campaign.textContent=d.campaign;
-    donationTotal.textContent=money(d.donationTotal);
-    donationCount.textContent=d.donationCount;
-    reconciled.textContent=money(d.reconciledDonations);
-    reclassifiedCount.textContent=d.reclassifiedCount;
-    progressText.textContent=`${money(d.donationTotal)} / ${money(d.target)}`;
-    bar.style.width=Math.min(100,(d.donationTotal/d.target)*100)+'%';
-    collectors.innerHTML=d.byCollector.map(c=>`<tr><td><b>${esc(c.name)}</b><br><span class="muted">${esc(c.code)}</span></td><td>${c.campaignRecordCount}</td><td>${c.donationCount}</td><td>${money(c.donationAmount)}</td></tr>`).join('');
-    recent.innerHTML=d.recent.map(r=>{
-      const isDonation=r.direction==='INCOMING' && r.donationStatus==='DONATION';
-      const status=isDonation?'<span class="pill">Donation</span>':'<span class="pill retracted">Removed / not donation</span>';
-      const donor=r.donor || '—';
-      return `<tr><td>${new Date(r.transactionAt).toLocaleString()}</td><td>${esc(r.collector)}</td><td>${esc(donor)}</td><td><b>${money(r.amount)}</b></td><td>${status}</td></tr>`;
-    }).join('');
+    dashboardData=d;
+    $('login').classList.add('hide');
+    $('app').classList.remove('hide');
+    $('campaign').textContent=d.campaign;
+    $('donationTotal').textContent=money(d.donationTotal);
+    $('donationCount').textContent=`${d.donationCount} entries`;
+    $('expenseTotal').textContent=money(d.campaignExpenseTotal);
+    $('expenseCount').textContent=`${d.campaignExpenseCount} entries`;
+    $('netCampaign').textContent=money(d.netCampaign);
+    $('ledgerCount').textContent=d.ledgerCount;
+    $('pendingIncoming').textContent=d.pendingIncoming;
+    $('pendingExpenses').textContent=d.pendingExpenses;
+    $('incomingTotal').textContent=money(d.incomingTotal);
+    $('outgoingTotal').textContent=money(d.outgoingTotal);
+    $('reconciled').textContent=money(d.reconciledDonations);
+    $('remaining').textContent=money(d.remaining);
+    $('progressText').textContent=`${money(d.donationTotal)} / ${money(d.target)}`;
+    $('bar').style.width=Math.min(100,d.target>0?(d.donationTotal/d.target)*100:0)+'%';
+
+    $('collectors').innerHTML=d.byCollector.map(c=>`<tr>
+      <td><b>${esc(c.name)}</b><br><span class="muted">${esc(c.code)}</span></td>
+      <td>${c.transactionCount}</td>
+      <td>${money(c.incomingAmount)}</td>
+      <td>${money(c.outgoingAmount)}</td>
+      <td><b>${money(c.donationAmount)}</b><br><span class="muted">${c.donationCount} donations</span></td>
+      <td><b>${money(c.expenseAmount)}</b><br><span class="muted">${c.expenseCount} expenses</span></td>
+      <td><b>${money(c.netCampaign)}</b></td>
+      <td>${c.pendingIncoming+c.pendingExpenses}</td>
+    </tr>`).join('');
+
+    const selected=$('collectorFilter').value;
+    $('collectorFilter').innerHTML='<option value="">All collectors</option>'+d.byCollector.map(c=>`<option value="${escAttr(c.code)}">${esc(c.name)} (${esc(c.code)})</option>`).join('');
+    $('collectorFilter').value=selected;
+    applyFilters();
   }
+
+  function classification(r){
+    if(r.direction==='INCOMING'){
+      if(r.donationStatus==='DONATION') return {key:'DONATION',label:'Donation',cls:'donation'};
+      if(r.donationStatus==='PENDING') return {key:'PENDING',label:'Donation review pending',cls:'pending'};
+      return {key:'PERSONAL',label:'Personal incoming',cls:'personal'};
+    }
+    if(r.expenseStatus==='CAMPAIGN_EXPENSE') return {key:'CAMPAIGN_EXPENSE',label:'Campaign expense',cls:'expense'};
+    if(r.expenseStatus==='PENDING') return {key:'PENDING',label:'Expense review pending',cls:'pending'};
+    return {key:'PERSONAL',label:'Personal outgoing',cls:'personal'};
+  }
+
+  function applyFilters(){
+    if(!dashboardData)return;
+    const collector=$('collectorFilter').value;
+    const direction=$('directionFilter').value;
+    const classKey=$('classFilter').value;
+    const q=$('searchFilter').value.trim().toLowerCase();
+    const rows=dashboardData.ledger.filter(r=>{
+      const c=classification(r);
+      if(collector&&r.collectorCode!==collector)return false;
+      if(direction&&r.direction!==direction)return false;
+      if(classKey&&c.key!==classKey)return false;
+      if(q){
+        const hay=[r.collectorCode,r.collectorName,r.donor,r.expenseNote,r.party,r.ref,r.source,c.label].join(' ').toLowerCase();
+        if(!hay.includes(q))return false;
+      }
+      return true;
+    });
+    $('visibleCount').textContent=`Showing ${rows.length} of ${dashboardData.ledger.length} loaded entries`;
+    $('ledger').innerHTML=rows.map(r=>{
+      const c=classification(r);
+      const detail=r.direction==='INCOMING'?(r.donor||'—'):(r.expenseNote||'—');
+      const dir=r.direction==='INCOMING'?'<span class="in">Incoming</span>':'<span class="out">Outgoing</span>';
+      return `<tr>
+        <td>${formatDate(r.transactionAt)}</td>
+        <td><b>${esc(r.collectorName)}</b><br><span class="muted">${esc(r.collectorCode)}</span></td>
+        <td>${dir}</td>
+        <td><b>${money(r.amount)}</b></td>
+        <td><span class="pill ${c.cls}">${esc(c.label)}</span></td>
+        <td class="note">${esc(detail)}</td>
+        <td>${esc(r.party||'—')}</td>
+        <td>${esc(r.source||'—')}</td>
+        <td>${esc(r.ref||'—')}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="9" class="muted">No ledger entries match these filters.</td></tr>';
+  }
+
+  function formatDate(v){const d=new Date(v);return Number.isNaN(d.getTime())?esc(v):d.toLocaleString();}
   function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+  function escAttr(s){return esc(s).replace(/`/g,'&#96;');}
+
+  $('openButton').addEventListener('click',load);
+  $('refreshButton').addEventListener('click',load);
+  ['collectorFilter','directionFilter','classFilter'].forEach(id=>$(id).addEventListener('change',applyFilters));
+  $('searchFilter').addEventListener('input',applyFilters);
+  $('pin').addEventListener('keydown',e=>{if(e.key==='Enter')load();});
 </script>
 </body>
 </html>

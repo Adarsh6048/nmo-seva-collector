@@ -5,7 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payments.db", null, 2) {
+class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payments.db", null, 3) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """
@@ -19,8 +19,9 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
                 source_app TEXT NOT NULL,
                 direction TEXT NOT NULL DEFAULT 'INCOMING',
                 donation_status TEXT NOT NULL DEFAULT 'PENDING',
-                synced INTEGER NOT NULL DEFAULT 0,
-                reconciled INTEGER NOT NULL DEFAULT 0
+                synced INTEGER NOT NULL DEFAULT 1,
+                reconciled INTEGER NOT NULL DEFAULT 0,
+                uploaded_once INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent()
         )
@@ -30,6 +31,10 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE payments ADD COLUMN direction TEXT NOT NULL DEFAULT 'INCOMING'")
             db.execSQL("ALTER TABLE payments ADD COLUMN donation_status TEXT NOT NULL DEFAULT 'PENDING'")
+        }
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE payments ADD COLUMN uploaded_once INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("UPDATE payments SET uploaded_once = CASE WHEN synced = 1 THEN 1 ELSE 0 END")
         }
     }
 
@@ -46,27 +51,31 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
             put("donation_status", payment.donationStatus.name)
             put("synced", if (payment.synced) 1 else 0)
             put("reconciled", if (payment.reconciled) 1 else 0)
+            put("uploaded_once", 0)
         }
         return writableDatabase.insertWithOnConflict("payments", null, values, SQLiteDatabase.CONFLICT_IGNORE) != -1L
     }
 
     fun updateClassification(eventId: String, status: DonationStatus, donorName: String? = null) {
+        val uploadedOnce = readableDatabase.rawQuery(
+            "SELECT uploaded_once FROM payments WHERE event_id = ?", arrayOf(eventId)
+        ).use { c -> c.moveToFirst() && c.getInt(0) == 1 }
+
         val values = ContentValues().apply {
             put("donation_status", status.name)
             if (status == DonationStatus.DONATION) put("donor_name", donorName?.trim())
             else putNull("donor_name")
-            put("synced", 0)
+
+            // Personal/non-donation transactions stay local. If a donation was already
+            // uploaded and is later reclassified, sync the reclassification once.
+            val needsServerUpdate = status == DonationStatus.DONATION || uploadedOnce
+            put("synced", if (needsServerUpdate) 0 else 1)
         }
         writableDatabase.update("payments", values, "event_id = ?", arrayOf(eventId))
     }
 
     fun updateDonorName(eventId: String, donorName: String) {
-        val values = ContentValues().apply {
-            put("donor_name", donorName.trim())
-            put("donation_status", DonationStatus.DONATION.name)
-            put("synced", 0)
-        }
-        writableDatabase.update("payments", values, "event_id = ?", arrayOf(eventId))
+        updateClassification(eventId, DonationStatus.DONATION, donorName)
     }
 
     fun setReconciled(eventId: String, reconciled: Boolean) {
@@ -81,7 +90,10 @@ class PaymentDbHelper(context: Context) : SQLiteOpenHelper(context, "nmo_payment
         if (eventIds.isEmpty()) return
         writableDatabase.beginTransaction()
         try {
-            val values = ContentValues().apply { put("synced", 1) }
+            val values = ContentValues().apply {
+                put("synced", 1)
+                put("uploaded_once", 1)
+            }
             eventIds.forEach { writableDatabase.update("payments", values, "event_id = ?", arrayOf(it)) }
             writableDatabase.setTransactionSuccessful()
         } finally {

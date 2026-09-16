@@ -138,9 +138,8 @@ function getDashboard(pin) {
 
   let donationTotal = 0;
   let reconciledDonations = 0;
-  let incomingCount = 0;
-  let outgoingCount = 0;
-  let pendingReviews = 0;
+  let donationCount = 0;
+  let reclassifiedCount = 0;
   const byCollector = {};
   const recent = [];
 
@@ -151,17 +150,18 @@ function getDashboard(pin) {
     const donationStatus = String(r[12] || 'PENDING').toUpperCase();
     const isDonation = direction === 'INCOMING' && donationStatus === 'DONATION';
 
-    if (direction === 'INCOMING') incomingCount++; else if (direction === 'OUTGOING') outgoingCount++;
-    if (direction === 'INCOMING' && donationStatus === 'PENDING') pendingReviews++;
     if (isDonation) {
       donationTotal += amount;
+      donationCount++;
       if (r[10] === true) reconciledDonations += amount;
+    } else {
+      reclassifiedCount++;
     }
 
     const code = String(r[3] || 'UNKNOWN');
     const name = String(r[4] || code);
-    if (!byCollector[code]) byCollector[code] = {code, name, donationAmount: 0, donationCount: 0, transactionCount: 0};
-    byCollector[code].transactionCount++;
+    if (!byCollector[code]) byCollector[code] = {code, name, donationAmount: 0, donationCount: 0, campaignRecordCount: 0};
+    byCollector[code].campaignRecordCount++;
     if (isDonation) {
       byCollector[code].donationAmount += amount;
       byCollector[code].donationCount++;
@@ -186,10 +186,9 @@ function getDashboard(pin) {
     target,
     donationTotal,
     reconciledDonations,
-    incomingCount,
-    outgoingCount,
-    pendingReviews,
-    transactionCount: Math.max(0, payments.length - 1),
+    donationCount,
+    reclassifiedCount,
+    campaignRecordCount: Math.max(0, payments.length - 1),
     remaining: Math.max(0, target - donationTotal),
     byCollector: Object.values(byCollector).sort((a,b) => b.donationAmount - a.donationAmount),
     recent: recent.slice(0, 60)

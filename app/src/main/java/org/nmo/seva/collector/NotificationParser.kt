@@ -29,11 +29,22 @@ object NotificationParser {
     )
 
     // PhonePe may render one visual sentence using multiple Android notification fields,
-    // for example title="XYZ" and text="sent Rs.1 to you". We therefore test both
-    // individual fields and adjacent fields joined with a space.
+    // for example title="XYZ" and text="sent Rs.1 to you".
     private val personSentAmountRegex = Regex(
         "^\\s*([^|•,\\n]+?)\\s+sent\\s+(?:₹|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)(?:\\s+to\\s+you\\b)?",
         RegexOption.IGNORE_CASE
+    )
+
+    // WhatsApp shares the same package for chats and payments, so parsing must be stricter
+    // to avoid treating ordinary chat messages that mention money as transactions.
+    private val whatsappIncomingRegexes = listOf(
+        Regex("\\byou\\s+received\\s+(?:₹|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s+from\\s+([^|•,\\n]+)", RegexOption.IGNORE_CASE),
+        Regex("\\bpayment\\s+(?:of\\s+)?(?:₹|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s+(?:has\\s+been\\s+)?received(?:\\s+from\\s+([^|•,\\n]+))?", RegexOption.IGNORE_CASE),
+        Regex("\\b(?:₹|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s+(?:has\\s+been\\s+)?received\\b", RegexOption.IGNORE_CASE)
+    )
+    private val whatsappOutgoingRegexes = listOf(
+        Regex("\\byou\\s+(?:sent|paid)\\s+(?:₹|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s+(?:to\\s+)?([^|•,\\n]+)", RegexOption.IGNORE_CASE),
+        Regex("\\bpayment\\s+(?:of\\s+)?(?:₹|rs\\.?|inr)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s+(?:was\\s+)?(?:sent|paid)(?:\\s+to\\s+([^|•,\\n]+))?", RegexOption.IGNORE_CASE)
     )
 
     private val refRegexes = listOf(
@@ -53,15 +64,18 @@ object NotificationParser {
         Regex("to\\s+([^•|,\\n]+)", RegexOption.IGNORE_CASE)
     )
 
-    fun parse(title: String?, text: String?, bigText: String? = null): ParsedTransaction? {
+    fun parse(
+        title: String?,
+        text: String?,
+        bigText: String? = null,
+        sourcePackage: String? = null
+    ): ParsedTransaction? {
         val parts = listOfNotNull(title, text, bigText)
             .map { normalize(it) }
             .filter { it.isNotBlank() }
             .distinct()
         if (parts.isEmpty()) return null
 
-        // Besides the raw fields, create space-joined candidates because some apps split
-        // "XYZ sent Rs.1 to you" into title="XYZ" + text="sent Rs.1 to you".
         val candidates = buildList {
             addAll(parts)
             if (parts.size >= 2) {
@@ -73,6 +87,10 @@ object NotificationParser {
         val combined = parts.joinToString(" | ")
         val lower = combined.lowercase(Locale.ENGLISH)
         if (ignoredSignals.any { lower.contains(it) }) return null
+
+        if (sourcePackage == "com.whatsapp" || sourcePackage == "com.whatsapp.w4b") {
+            return parseWhatsApp(candidates)
+        }
 
         val personSentMatch = candidates.asSequence()
             .mapNotNull { candidate -> personSentAmountRegex.find(candidate) }
@@ -120,13 +138,38 @@ object NotificationParser {
                 .firstOrNull()
         }
 
-        return ParsedTransaction(
-            amount = amount,
-            direction = direction,
-            senderHint = partyHint,
-            transactionRef = ref
-        )
+        return ParsedTransaction(amount, direction, partyHint, ref)
     }
+
+    private fun parseWhatsApp(candidates: List<String>): ParsedTransaction? {
+        val incoming = whatsappIncomingRegexes.asSequence()
+            .flatMap { regex -> candidates.asSequence().mapNotNull { c -> regex.find(c) } }
+            .firstOrNull()
+        if (incoming != null) {
+            val amount = incoming.groupValues.getOrNull(1)?.replace(",", "")?.toDoubleOrNull() ?: return null
+            if (amount <= 0.0 || amount > 1_000_000.0) return null
+            val party = incoming.groupValues.getOrNull(2)?.trim()?.takeIf { it.isNotBlank() }?.take(80)
+            val ref = findRef(candidates)
+            return ParsedTransaction(amount, TransactionDirection.INCOMING, party, ref)
+        }
+
+        val outgoing = whatsappOutgoingRegexes.asSequence()
+            .flatMap { regex -> candidates.asSequence().mapNotNull { c -> regex.find(c) } }
+            .firstOrNull()
+        if (outgoing != null) {
+            val amount = outgoing.groupValues.getOrNull(1)?.replace(",", "")?.toDoubleOrNull() ?: return null
+            if (amount <= 0.0 || amount > 1_000_000.0) return null
+            val party = outgoing.groupValues.getOrNull(2)?.trim()?.takeIf { it.isNotBlank() }?.take(80)
+            val ref = findRef(candidates)
+            return ParsedTransaction(amount, TransactionDirection.OUTGOING, party, ref)
+        }
+
+        return null
+    }
+
+    private fun findRef(candidates: List<String>): String? = refRegexes.asSequence()
+        .flatMap { regex -> candidates.asSequence().mapNotNull { regex.find(it)?.groupValues?.getOrNull(1) } }
+        .firstOrNull()
 
     private fun normalize(value: String): String = value
         .replace(Regex("\\s+"), " ")

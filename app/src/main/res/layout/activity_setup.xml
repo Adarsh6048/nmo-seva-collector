@@ -147,6 +147,15 @@
                 android:textColor="@color/text_primary" />
         </LinearLayout>
 
+        <CheckBox
+            android:id="@+id/notificationReviewCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:buttonTint="@color/primary"
+            android:text="I checked notification settings for the payment apps I use and they are enabled."
+            android:textColor="@color/text_primary" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

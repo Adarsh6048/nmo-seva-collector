@@ -38,6 +38,7 @@ class SetupActivity : AppCompatActivity() {
         binding.tokenInput.setText(prefs.collectorToken)
         binding.backendInput.setText(prefs.backendUrl)
         binding.ledgerConsentCheck.isChecked = prefs.ledgerConsent
+        binding.notificationReviewCheck.isChecked = prefs.notificationReadinessAcknowledged
 
         binding.notificationAccessButton.setOnClickListener {
             if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -57,6 +58,10 @@ class SetupActivity : AppCompatActivity() {
                 Toast.makeText(this, "Enter collector code, token and a valid HTTPS backend URL", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
+            if (!binding.notificationReviewCheck.isChecked) {
+                Toast.makeText(this, "Please verify notifications are enabled for the payment apps you use", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
             if (!binding.ledgerConsentCheck.isChecked) {
                 Toast.makeText(this, "Please acknowledge the ledger notice before enabling collection", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
@@ -66,6 +71,7 @@ class SetupActivity : AppCompatActivity() {
             prefs.collectorCode = code
             prefs.collectorToken = token
             prefs.backendUrl = url
+            prefs.notificationReadinessAcknowledged = true
             prefs.ledgerConsent = true
             SyncScheduler.enqueue(this)
             Toast.makeText(this, "Collector setup saved", Toast.LENGTH_SHORT).show()

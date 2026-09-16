@@ -1,8 +1,8 @@
 # Setup guide
 
-## A. Create or update the central Google Sheet
+## A. Update the central Google Sheet backend
 
-1. Open the Google Sheet used by the campaign.
+1. Open the campaign Google Sheet.
 2. Open **Extensions → Apps Script**.
 3. Replace `Code.gs` with the latest `backend/apps-script/Code.gs` from this repository.
 4. Replace the HTML file named exactly `Dashboard` with the latest `backend/apps-script/Dashboard.html`.
@@ -13,25 +13,21 @@
 setupSheets()
 ```
 
-`setupSheets()` is safe to run again after upgrading. It keeps existing rows and upgrades the `Payments` sheet to include:
+`setupSheets()` is safe to run again. It creates a new `Ledger` sheet and migrates existing rows from the old `Payments` sheet without deleting that old sheet.
 
-- Direction
-- Donation Status
+The central workbook then contains:
 
-Existing old payment rows are migrated as incoming transactions; rows that already have a donor name are treated as donations, while unnamed old rows remain pending review.
-
-The workbook contains:
-
-- `Payments`
+- `Ledger` — incoming + outgoing transaction ledger
+- `Payments` — legacy sheet retained for safety if it already exists
 - `Collectors`
 - `Settings`
 - `Expenses`
 
 The default campaign target is **₹4,00,000**.
 
-## B. Admin PIN and collectors
+## B. Collector credentials
 
-Collector credentials remain unchanged after this upgrade. You do **not** need to create a new collector token merely because the app was updated.
+Existing collector code/token pairs remain valid. You do not need to create new tokens after this upgrade.
 
 For a new collector:
 
@@ -41,82 +37,86 @@ addCollector("NMO02", "Collector Name")
 
 Keep the returned token private.
 
-## C. Redeploy Apps Script after code changes
+## C. Redeploy Apps Script
 
 After replacing `Code.gs` and `Dashboard.html`:
 
-1. Click **Deploy → Manage deployments**.
-2. Edit the current Web app deployment.
+1. **Deploy → Manage deployments**.
+2. Edit the active Web app deployment.
 3. Choose **New version**.
 4. Deploy.
-5. Keep using the `/exec` URL from the active deployment.
-
-If you instead create a completely new deployment, update the backend URL inside every collector app.
+5. Keep using the same `/exec` URL.
 
 ## D. Update the Android app
 
-1. In Android Studio choose **Git → Pull**.
+1. Android Studio → **Git → Pull**.
 2. Wait for Gradle sync.
-3. Run the app on the phone again to install the latest build over the existing app.
-4. Existing collector settings and the local SQLite database remain on the phone when installing an update normally.
-5. Confirm **Notification access** is still enabled.
+3. Run the app on the collector phone again.
+4. The local SQLite database upgrades automatically.
+5. Open **Collector settings** once after this upgrade.
+6. Read and accept the transaction-ledger notice, then save setup.
+7. Confirm **Notification access** remains enabled.
 
-The local database upgrades automatically and adds transaction direction, donation classification and private upload-state tracking.
+The collector is informed that parsed transaction metadata from supported UPI notifications is synced to the central campaign ledger. Raw notification text, UPI PINs, bank passwords, SMS and contacts are not collected.
 
-## E. New transaction workflow
+## E. Transaction workflow
 
-### Incoming
+### Incoming transaction
 
-1. Transaction is saved locally as `INCOMING` + `PENDING`.
-2. Collector receives a prompt to review it.
-3. Collector chooses:
-   - **Mark as donation** → donor name / Anonymous required
-   - **Not a donation**
+1. Detected as `INCOMING` and immediately queued to the central ledger.
+2. Donation status begins as `PENDING`.
+3. Collector can choose:
+   - **Mark as donation** → donor name or Anonymous required
+   - **Personal / not a donation**
    - **Decide later**
-4. If marked **Donation**, it is queued for campaign sync.
-5. If marked **Not a donation** or left pending, it stays only on that collector's phone.
+4. Any later classification change is synced to the same ledger row.
 
-### Outgoing
+### Outgoing transaction
 
-1. Transaction is saved locally as `OUTGOING`.
-2. It is automatically `NOT_DONATION`.
-3. It remains visible in the collector's local transaction ledger.
-4. It is not uploaded to the campaign backend and never increases fundraising totals.
+1. Detected as `OUTGOING` and immediately queued to the central ledger.
+2. Expense status begins as `PENDING`.
+3. Collector can choose:
+   - **Mark as campaign expense** → short expense comment required
+   - **Personal / not campaign expense**
+   - **Decide later**
+4. Campaign expenses appear separately in the admin report and reduce the displayed net campaign balance.
 
-### Privacy rule
+## F. Admin dashboard
 
-The central Google Sheet is for the campaign, not for a collector's private banking history. The app therefore uploads only transactions the collector explicitly identifies as donations. If a synced donation is later reclassified, only the correction is sent so the campaign total can be fixed.
+The dashboard shows:
 
-## F. Test before fundraising
+- donation total and donation count
+- campaign expense total and expense count
+- net campaign balance = donations − campaign expenses
+- all detected incoming and outgoing values
+- pending donation and expense reviews
+- collector-wise transaction, donation and expense report
+- searchable/filterable ledger by collector, direction and classification
+
+## G. Test before fundraising
 
 Use small real transactions such as ₹1 or ₹10.
 
-1. Receive money into the collector's UPI account.
-2. Confirm the app shows the incoming transaction and asks whether it is a donation.
-3. Mark one test as **Donation** and another as **Not a donation**.
-4. Send a small outgoing payment and confirm it appears under recent transactions on the phone.
-5. Confirm the outgoing and personal incoming payment do **not** appear in the central Google Sheet.
-6. Confirm only the test marked **Donation** appears on the Apps Script dashboard and contributes to fundraising progress.
-7. Check the `Payments` sheet for `Direction` and `Donation Status`.
+1. Receive a PhonePe/UPI payment and confirm it appears as incoming.
+2. Mark it as Donation and enter a donor name.
+3. Receive another incoming payment and mark it Personal.
+4. Make a small outgoing payment.
+5. Mark one outgoing test as Campaign expense and enter a comment such as `test printing`.
+6. Mark another outgoing test as Personal.
+7. Confirm all four transaction records appear in the central `Ledger` sheet.
+8. Confirm only Donation entries increase fundraising progress.
+9. Confirm only Campaign expense entries increase campaign expenses.
+10. Open the dashboard and verify the collector-wise report and ledger filters.
 
-Notification wording differs by UPI app/version. If a real transaction is missed, capture only the notification wording needed for parser debugging and hide sensitive bank details.
+Notification wording differs by UPI app/version. If a real transaction is missed, capture only the visible notification wording needed for parser debugging and hide sensitive bank details.
 
-## G. Reconciliation
+## H. Reconciliation
 
-Notification detection is not final bank verification.
+Notification detection is not final bank verification. At the end of a shift/day, compare campaign ledger entries with UPI/bank history and set `Reconciled` to `TRUE` for confirmed records where appropriate.
 
-At the end of a shift/day:
-
-1. Collector opens their UPI/bank history.
-2. Compare campaign donations with amount, time and available reference number in the `Payments` sheet.
-3. Set `Reconciled` to `TRUE` for confirmed donation rows.
-4. The dashboard separately displays reconciled donation value.
-
-## H. Campaign settings
+## I. Campaign settings
 
 In the `Settings` sheet:
 
 - `TARGET` → `400000`
 - `CAMPAIGN` → campaign display name
-
-The dashboard reads these values automatically.

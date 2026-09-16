@@ -35,7 +35,13 @@ class UpiNotificationListenerService : NotificationListenerService() {
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
         val parsed = NotificationParser.parse(title, text, bigText) ?: return
 
-        val eventId = sha256("${sbn.packageName}|${sbn.key}|${sbn.postTime}|${parsed.amount}")
+        val eventId = sha256("${sbn.packageName}|${sbn.key}|${sbn.postTime}|${parsed.direction}|${parsed.amount}")
+        val donationStatus = if (parsed.direction == TransactionDirection.INCOMING) {
+            DonationStatus.PENDING
+        } else {
+            DonationStatus.NOT_DONATION
+        }
+
         val db = PaymentDbHelper(applicationContext)
         val inserted = db.insertIfNew(
             Payment(
@@ -46,6 +52,8 @@ class UpiNotificationListenerService : NotificationListenerService() {
                 transactionRef = parsed.transactionRef,
                 receivedAt = sbn.postTime,
                 sourceApp = sourceName,
+                direction = parsed.direction,
+                donationStatus = donationStatus,
                 synced = false,
                 reconciled = false
             )
@@ -53,10 +61,12 @@ class UpiNotificationListenerService : NotificationListenerService() {
         if (!inserted) return
 
         SyncScheduler.enqueue(applicationContext)
-        promptForDonorName(eventId, parsed.amount, sourceName)
+        if (parsed.direction == TransactionDirection.INCOMING) {
+            promptForClassification(eventId, parsed.amount, sourceName)
+        }
     }
 
-    private fun promptForDonorName(eventId: String, amount: Double, source: String) {
+    private fun promptForClassification(eventId: String, amount: Double, source: String) {
         val intent = Intent(this, DonorEntryActivity::class.java).apply {
             putExtra("event_id", eventId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -71,7 +81,7 @@ class UpiNotificationListenerService : NotificationListenerService() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_medical)
             .setContentTitle("$formatted received")
-            .setContentText("Tap to add the donor name • $source")
+            .setContentText("Tap to mark this as donation or personal payment • $source")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)
@@ -88,7 +98,7 @@ class UpiNotificationListenerService : NotificationListenerService() {
                 getString(R.string.channel_name),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply { description = getString(R.string.channel_desc) }
-            (getSystemService(NotificationManager::class.java)).createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 

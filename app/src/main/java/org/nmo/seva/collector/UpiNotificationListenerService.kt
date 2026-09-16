@@ -54,13 +54,13 @@ class UpiNotificationListenerService : NotificationListenerService() {
                 sourceApp = sourceName,
                 direction = parsed.direction,
                 donationStatus = donationStatus,
-                synced = false,
+                // New transactions stay local until the collector marks an incoming one as Donation.
+                synced = true,
                 reconciled = false
             )
         )
         if (!inserted) return
 
-        SyncScheduler.enqueue(applicationContext)
         if (parsed.direction == TransactionDirection.INCOMING) {
             promptForClassification(eventId, parsed.amount, sourceName)
         }

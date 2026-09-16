@@ -17,6 +17,7 @@ class SetupActivity : AppCompatActivity() {
         binding.codeInput.setText(prefs.collectorCode)
         binding.tokenInput.setText(prefs.collectorToken)
         binding.backendInput.setText(prefs.backendUrl)
+        binding.ledgerConsentCheck.isChecked = prefs.ledgerConsent
 
         binding.saveButton.setOnClickListener {
             val code = binding.codeInput.text.toString().trim().uppercase()
@@ -26,10 +27,15 @@ class SetupActivity : AppCompatActivity() {
                 Toast.makeText(this, "Enter collector code, token and a valid HTTPS backend URL", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
             }
+            if (!binding.ledgerConsentCheck.isChecked) {
+                Toast.makeText(this, "Please acknowledge the transaction-ledger notice before enabling collection", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
             prefs.collectorName = binding.nameInput.text.toString()
             prefs.collectorCode = code
             prefs.collectorToken = token
             prefs.backendUrl = url
+            prefs.ledgerConsent = true
             SyncScheduler.enqueue(this)
             Toast.makeText(this, "Setup saved", Toast.LENGTH_SHORT).show()
             finish()

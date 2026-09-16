@@ -30,7 +30,7 @@ class UpiNotificationListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val prefs = AppPreferences(applicationContext)
-        if (!prefs.ledgerConsent) return
+        if (!prefs.ledgerConsent || !prefs.notificationReadinessAcknowledged) return
 
         val sourceName = supportedPackages[sbn.packageName] ?: return
         val n = sbn.notification ?: return

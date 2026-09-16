@@ -3,10 +3,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <queries>
+        <package android:name="com.phonepe.app" />
+        <package android:name="com.google.android.apps.nbu.paisa.user" />
+        <package android:name="net.one97.paytm" />
+        <package android:name="in.org.npci.upiapp" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_medical"
-        android:label="NMO Seva Collector"
+        android:label="NMO Seva Ledger"
         android:supportsRtl="true"
         android:theme="@style/Theme.NMOSeva">
 
@@ -27,7 +36,7 @@
 
         <service
             android:name=".UpiNotificationListenerService"
-            android:label="NMO payment detector"
+            android:label="NMO transaction detector"
             android:exported="false"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>

@@ -11,6 +11,9 @@ struct NMOSevaLedgerApp: App {
                 .environmentObject(settings)
                 .environmentObject(ledger)
                 .preferredColorScheme(.dark)
+                .onAppear {
+                    SharedImportService.consume(into: ledger)
+                }
         }
     }
 }

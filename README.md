@@ -1,33 +1,35 @@
-# NMO Seva Collector — MVP
+# NMO Seva Collector
 
-Android collector app + Google Sheets / Apps Script backend for tracking UPI transaction notifications from **personal QR / UPI accounts** and letting the collector decide which incoming payments are donations.
+Android collector app + Google Sheets / Apps Script backend for campaign accounting from UPI transaction notifications on approved collector phones.
 
 ## What this version does
 
-1. Android's Notification Listener watches supported UPI apps on the collector phone.
-2. Incoming and outgoing transaction notifications are detected and stored in the phone's local SQLite ledger.
-3. Every transaction is tagged as `INCOMING` or `OUTGOING`.
-4. Outgoing transactions stay local and are automatically classified as `NOT_DONATION`.
-5. Incoming transactions start as `PENDING` and the collector gets a prompt such as **“₹500 received — tap to mark as donation or personal payment.”**
-6. The collector can choose:
-   - **Mark as donation** → enter donor name or choose Anonymous
-   - **Not a donation** → personal/non-campaign payment
+1. Android's Notification Listener watches supported UPI apps on a collector phone after the collector acknowledges the ledger notice.
+2. Incoming and outgoing transaction notifications are detected and stored in the local SQLite ledger.
+3. All detected transaction metadata is queued to the central `Ledger` sheet so the admin has a collector-wise accounting record.
+4. Incoming transactions start as `PENDING`; the collector chooses:
+   - **Donation** → donor name or Anonymous
+   - **Personal / not a donation**
    - **Decide later**
-7. Only transactions classified as `DONATION` count toward the ₹4 lakh fundraising total.
-8. Personal, pending and outgoing transactions remain on the collector's phone and are **not uploaded to the central Google Sheet**.
-9. Donations sync through WorkManager when internet is available. If an already-uploaded donation is later reclassified as not a donation, that change is synced so the central total is corrected.
-10. The central dashboard contains campaign donation records, not the collector's full personal transaction history.
+5. Outgoing transactions start with expense review pending; the collector chooses:
+   - **Campaign expense** → a short expense comment is required
+   - **Personal / not campaign expense**
+   - **Decide later**
+6. Only incoming transactions classified as `DONATION` count toward fundraising progress.
+7. Only outgoing transactions classified as `CAMPAIGN_EXPENSE` count toward campaign expenses.
+8. The admin dashboard shows donation total, campaign expenses, net campaign balance, pending reviews, collector-wise reports and a searchable transaction ledger.
+9. WorkManager syncs queued ledger changes when internet is available.
 
-No UPI PIN, bank password, SMS access, contacts permission or accessibility permission is requested.
+The collector is shown a ledger notice during setup. The app does not request a UPI PIN, bank password, SMS access, contacts permission or accessibility permission. Raw notification text is not uploaded; only parsed transaction fields are sent.
 
-> Important: this app tracks **notifications**, not the bank ledger itself. A transaction can only be detected when a supported UPI app posts a notification that contains enough transaction information. Final accounting should be reconciled with the UPI/bank transaction history.
+> Important: this app tracks **notifications**, not the bank ledger itself. A transaction can only be detected when a supported UPI app posts a notification containing enough transaction information. Final accounting should be reconciled against UPI/bank transaction history.
 
 ## Repository layout
 
 - `app/` — Android Studio project (Kotlin, XML layouts, SQLite, WorkManager)
-- `backend/apps-script/Code.gs` — Google Sheets endpoint + collector authentication + dashboard data
-- `backend/apps-script/Dashboard.html` — admin dashboard UI
-- `docs/SETUP.md` — exact setup / update steps
+- `backend/apps-script/Code.gs` — Google Sheets endpoint, collector authentication and report data
+- `backend/apps-script/Dashboard.html` — admin dashboard with collector report + ledger filters
+- `docs/SETUP.md` — setup and upgrade steps
 - `docs/ARCHITECTURE.md` — data flow and security model
 
 ## Supported UPI apps
@@ -44,15 +46,18 @@ The package allow-list lives in `UpiNotificationListenerService.kt`. Notificatio
 - Android 8.0+ (`minSdk 26`)
 - Android Studio with JDK 17+
 - Notification Access enabled by each collector
-- On Android 13+, normal notification permission so the donation-review prompt can be shown
+- Collector acknowledgement of the central ledger notice
+- On Android 13+, normal notification permission so transaction-review prompts can be shown
 
-## Donation fields synced to the campaign backend
+## Fields synced to the central ledger
 
-- event fingerprint
-- amount
-- direction
-- donation status
-- donor name when marked as donation
+- generated event fingerprint
+- transaction amount
+- incoming/outgoing direction
+- donation classification
+- expense classification
+- donor name when classified as donation
+- expense comment when classified as campaign expense
 - optional counterparty hint parsed from the notification
 - optional UPI/reference ID when present
 - transaction time

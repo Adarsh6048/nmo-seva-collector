@@ -31,8 +31,6 @@ The default campaign target is **₹4,00,000**.
 
 ## B. Admin PIN and collectors
 
-If not already configured, set an admin PIN using a helper function or your existing setup method.
-
 Collector credentials remain unchanged after this upgrade. You do **not** need to create a new collector token merely because the app was updated.
 
 For a new collector:
@@ -63,44 +61,43 @@ If you instead create a completely new deployment, update the backend URL inside
 4. Existing collector settings and the local SQLite database remain on the phone when installing an update normally.
 5. Confirm **Notification access** is still enabled.
 
-The local database automatically upgrades from version 1 to version 2 and adds:
-
-- `direction`
-- `donation_status`
+The local database upgrades automatically and adds transaction direction, donation classification and private upload-state tracking.
 
 ## E. New transaction workflow
 
-For supported UPI notifications:
-
 ### Incoming
 
-1. Transaction is saved as `INCOMING` + `PENDING`.
+1. Transaction is saved locally as `INCOMING` + `PENDING`.
 2. Collector receives a prompt to review it.
 3. Collector chooses:
    - **Mark as donation** → donor name / Anonymous required
    - **Not a donation**
    - **Decide later**
-4. Only **Mark as donation** contributes to the campaign fundraising total.
+4. If marked **Donation**, it is queued for campaign sync.
+5. If marked **Not a donation** or left pending, it stays only on that collector's phone.
 
 ### Outgoing
 
-1. Transaction is saved as `OUTGOING`.
+1. Transaction is saved locally as `OUTGOING`.
 2. It is automatically `NOT_DONATION`.
-3. It remains visible in the transaction ledger for accountability.
-4. It never increases the fundraising total.
+3. It remains visible in the collector's local transaction ledger.
+4. It is not uploaded to the campaign backend and never increases fundraising totals.
+
+### Privacy rule
+
+The central Google Sheet is for the campaign, not for a collector's private banking history. The app therefore uploads only transactions the collector explicitly identifies as donations. If a synced donation is later reclassified, only the correction is sent so the campaign total can be fixed.
 
 ## F. Test before fundraising
 
 Use small real transactions such as ₹1 or ₹10.
 
-Test both directions if possible:
-
 1. Receive money into the collector's UPI account.
 2. Confirm the app shows the incoming transaction and asks whether it is a donation.
 3. Mark one test as **Donation** and another as **Not a donation**.
-4. Send a small outgoing payment and confirm it appears under recent transactions as outgoing.
-5. Open the Apps Script dashboard and verify only the transaction marked **Donation** is added to fundraising progress.
-6. Check the `Payments` sheet for `Direction` and `Donation Status`.
+4. Send a small outgoing payment and confirm it appears under recent transactions on the phone.
+5. Confirm the outgoing and personal incoming payment do **not** appear in the central Google Sheet.
+6. Confirm only the test marked **Donation** appears on the Apps Script dashboard and contributes to fundraising progress.
+7. Check the `Payments` sheet for `Direction` and `Donation Status`.
 
 Notification wording differs by UPI app/version. If a real transaction is missed, capture only the notification wording needed for parser debugging and hide sensitive bank details.
 
@@ -111,8 +108,8 @@ Notification detection is not final bank verification.
 At the end of a shift/day:
 
 1. Collector opens their UPI/bank history.
-2. Compare amount, time and available reference number with the `Payments` sheet.
-3. Set `Reconciled` to `TRUE` for confirmed rows.
+2. Compare campaign donations with amount, time and available reference number in the `Payments` sheet.
+3. Set `Reconciled` to `TRUE` for confirmed donation rows.
 4. The dashboard separately displays reconciled donation value.
 
 ## H. Campaign settings

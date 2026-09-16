@@ -13,12 +13,12 @@
 setupSheets()
 ```
 
-`setupSheets()` is safe to run again. It creates a new `Ledger` sheet and migrates existing rows from the old `Payments` sheet without deleting that old sheet.
+`setupSheets()` is safe to run again. It creates or upgrades the central `Ledger` sheet and keeps the old `Payments` sheet for safety if it already exists.
 
-The central workbook then contains:
+The workbook contains:
 
 - `Ledger` — incoming + outgoing transaction ledger
-- `Payments` — legacy sheet retained for safety if it already exists
+- `Payments` — legacy sheet retained if it already exists
 - `Collectors`
 - `Settings`
 - `Expenses`
@@ -27,9 +27,9 @@ The default campaign target is **₹4,00,000**.
 
 ## B. Collector credentials
 
-Existing collector code/token pairs remain valid. You do not need to create new tokens after this upgrade.
+Existing collector code/token pairs remain valid. **Do not generate a new token just because the Android app or backend was updated.**
 
-For a new collector:
+For a new collector only:
 
 ```javascript
 addCollector("NMO02", "Collector Name")
@@ -52,12 +52,18 @@ After replacing `Code.gs` and `Dashboard.html`:
 1. Android Studio → **Git → Pull**.
 2. Wait for Gradle sync.
 3. Run the app on the collector phone again.
-4. The local SQLite database upgrades automatically.
-5. Open **Collector settings** once after this upgrade.
-6. Read and accept the transaction-ledger notice, then save setup.
-7. Confirm **Notification access** remains enabled.
+4. The existing collector code, token, backend URL and local ledger remain when the app is updated normally.
+5. Open **Collector settings** after this upgrade.
+6. Tap **Enable Notification Access** and enable **NMO Seva Ledger** in Android settings.
+7. Tap **Review payment-app notifications**. For every payment app the collector uses, open its Android notification settings and make sure notifications are allowed.
+8. Supported apps currently include PhonePe, Google Pay, Paytm, BHIM, WhatsApp Pay and WhatsApp Business Pay.
+9. Tick the notification-readiness confirmation.
+10. Read and accept the transaction-ledger notice.
+11. Save collector setup.
 
-The collector is informed that parsed transaction metadata from supported UPI notifications is synced to the central campaign ledger. Raw notification text, UPI PINs, bank passwords, SMS and contacts are not collected.
+Android does not allow NMO Seva Ledger to silently turn another app's notifications on. The setup screen therefore opens the system notification settings for each installed supported payment app and requires the collector to confirm the apps they use have notifications enabled.
+
+The Android UI is an always-dark NMO-branded design using the supplied NMO logo.
 
 ## E. Transaction workflow
 
@@ -108,7 +114,7 @@ Use small real transactions such as ₹1 or ₹10.
 9. Confirm only Campaign expense entries increase campaign expenses.
 10. Open the dashboard and verify the collector-wise report and ledger filters.
 
-Notification wording differs by UPI app/version. If a real transaction is missed, capture only the visible notification wording needed for parser debugging and hide sensitive bank details.
+Notification wording differs by payment app/version. If a real transaction is missed, capture only the visible notification wording needed for parser debugging and hide sensitive bank details.
 
 ## H. Reconciliation
 

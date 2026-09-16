@@ -30,45 +30,82 @@ class DonorEntryActivity : AppCompatActivity() {
             append("\n")
             append(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(payment.receivedAt)))
         }
-        payment.donorName?.let { binding.donorInput.setText(it) }
-        binding.anonymousCheck.isChecked = payment.donorName == "Anonymous"
 
-        if (payment.direction == TransactionDirection.OUTGOING) {
-            binding.questionText.text = "Outgoing transactions are tracked for the ledger and are not counted as donations."
-            binding.donorInput.visibility = View.GONE
-            binding.anonymousCheck.visibility = View.GONE
-            binding.saveButton.visibility = View.GONE
-            binding.notDonationButton.text = "Confirm as non-donation"
-            binding.laterButton.visibility = View.GONE
+        if (payment.direction == TransactionDirection.INCOMING) {
+            setupIncoming(payment)
         } else {
-            binding.questionText.text = when (payment.donationStatus) {
-                DonationStatus.DONATION -> "This transaction is marked as a donation. You can update the donor name below."
-                DonationStatus.NOT_DONATION -> "This transaction is currently marked as not a donation."
-                DonationStatus.PENDING -> "Is this incoming payment a donation?"
-            }
+            setupOutgoing(payment)
         }
 
-        binding.anonymousCheck.setOnCheckedChangeListener { _, checked -> binding.donorInput.isEnabled = !checked }
+        binding.anonymousCheck.setOnCheckedChangeListener { _, checked ->
+            binding.donorInput.isEnabled = !checked
+        }
 
         binding.saveButton.setOnClickListener {
-            val donor = if (binding.anonymousCheck.isChecked) "Anonymous" else binding.donorInput.text.toString().trim()
-            if (donor.isBlank()) {
-                binding.donorInput.error = "Enter donor name or choose Anonymous"
-                return@setOnClickListener
+            if (payment.direction == TransactionDirection.INCOMING) {
+                val donor = if (binding.anonymousCheck.isChecked) "Anonymous" else binding.donorInput.text.toString().trim()
+                if (donor.isBlank()) {
+                    binding.donorInput.error = "Enter donor name or choose Anonymous"
+                    return@setOnClickListener
+                }
+                db.updateClassification(eventId, DonationStatus.DONATION, donor)
+                SyncScheduler.enqueue(this)
+                Toast.makeText(this, "Marked as donation", Toast.LENGTH_SHORT).show()
+            } else {
+                val note = binding.expenseInput.text.toString().trim()
+                if (note.isBlank()) {
+                    binding.expenseInput.error = "Add a short expense comment"
+                    return@setOnClickListener
+                }
+                db.updateExpenseClassification(eventId, ExpenseStatus.CAMPAIGN_EXPENSE, note)
+                SyncScheduler.enqueue(this)
+                Toast.makeText(this, "Marked as campaign expense", Toast.LENGTH_SHORT).show()
             }
-            db.updateClassification(eventId, DonationStatus.DONATION, donor)
-            SyncScheduler.enqueue(this)
-            Toast.makeText(this, "Marked as donation", Toast.LENGTH_SHORT).show()
             finish()
         }
 
         binding.notDonationButton.setOnClickListener {
-            db.updateClassification(eventId, DonationStatus.NOT_DONATION)
+            if (payment.direction == TransactionDirection.INCOMING) {
+                db.updateClassification(eventId, DonationStatus.NOT_DONATION)
+                Toast.makeText(this, "Marked as personal / not a donation", Toast.LENGTH_SHORT).show()
+            } else {
+                db.updateExpenseClassification(eventId, ExpenseStatus.PERSONAL)
+                Toast.makeText(this, "Marked as personal / not campaign expense", Toast.LENGTH_SHORT).show()
+            }
             SyncScheduler.enqueue(this)
-            Toast.makeText(this, "Marked as not a donation", Toast.LENGTH_SHORT).show()
             finish()
         }
 
         binding.laterButton.setOnClickListener { finish() }
+    }
+
+    private fun setupIncoming(payment: Payment) {
+        binding.expenseInput.visibility = View.GONE
+        binding.donorInput.visibility = View.VISIBLE
+        binding.anonymousCheck.visibility = View.VISIBLE
+        payment.donorName?.let { binding.donorInput.setText(it) }
+        binding.anonymousCheck.isChecked = payment.donorName == "Anonymous"
+        binding.saveButton.text = "Mark as donation"
+        binding.notDonationButton.text = "Personal / not a donation"
+        binding.questionText.text = when (payment.donationStatus) {
+            DonationStatus.DONATION -> "This is marked as a donation. You can update the donor name."
+            DonationStatus.NOT_DONATION -> "This is currently marked as a personal incoming payment."
+            DonationStatus.PENDING -> "Is this incoming payment a donation?"
+        }
+    }
+
+    private fun setupOutgoing(payment: Payment) {
+        binding.donorInput.visibility = View.GONE
+        binding.anonymousCheck.visibility = View.GONE
+        binding.expenseInput.visibility = View.VISIBLE
+        payment.expenseNote?.let { binding.expenseInput.setText(it) }
+        binding.saveButton.text = "Mark as campaign expense"
+        binding.notDonationButton.text = "Personal / not campaign expense"
+        binding.questionText.text = when (payment.expenseStatus) {
+            ExpenseStatus.CAMPAIGN_EXPENSE -> "This outgoing transaction is marked as a campaign expense. Update the comment if needed."
+            ExpenseStatus.PERSONAL -> "This outgoing transaction is currently marked as personal."
+            ExpenseStatus.PENDING -> "Was this outgoing payment a campaign expense?"
+            ExpenseStatus.NOT_APPLICABLE -> "Review this outgoing transaction."
+        }
     }
 }

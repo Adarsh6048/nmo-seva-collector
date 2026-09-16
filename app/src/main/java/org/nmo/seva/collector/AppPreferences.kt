@@ -21,5 +21,12 @@ class AppPreferences(context: Context) {
         get() = prefs.getString("backend_url", "") ?: ""
         set(value) = prefs.edit().putString("backend_url", value.trim()).apply()
 
-    fun isConfigured(): Boolean = collectorCode.isNotBlank() && collectorToken.isNotBlank() && backendUrl.startsWith("https://")
+    var ledgerConsent: Boolean
+        get() = prefs.getBoolean("ledger_consent", false)
+        set(value) = prefs.edit().putBoolean("ledger_consent", value).apply()
+
+    fun isConfigured(): Boolean = collectorCode.isNotBlank() &&
+        collectorToken.isNotBlank() &&
+        backendUrl.startsWith("https://") &&
+        ledgerConsent
 }

@@ -13,6 +13,7 @@
     </queries>
 
     <application
+        android:name=".NmoApplication"
         android:allowBackup="true"
         android:icon="@drawable/ic_medical"
         android:label="NMO Seva Ledger"

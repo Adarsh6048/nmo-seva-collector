@@ -4,15 +4,15 @@
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    :root { --p:#0b6b4f; --bg:#f5f7f6; --text:#12211b; --muted:#65746d; --card:#fff; --warn:#b54708; }
+    :root { --p:#0b6b4f; --bg:#f5f7f6; --text:#12211b; --muted:#65746d; --card:#fff; --warn:#b54708; --blue:#155eef; --red:#b42318; }
     *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
-    .wrap{max-width:1050px;margin:0 auto;padding:24px}.top{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+    .wrap{max-width:1120px;margin:0 auto;padding:24px}.top{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
     h1{margin:0;font-size:28px}.muted{color:var(--muted)} .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}
     .card{background:var(--card);border-radius:18px;padding:18px;box-shadow:0 1px 4px #00000010}.big{font-size:28px;font-weight:750;margin-top:5px}
     .progress{height:16px;background:#e6ebe8;border-radius:999px;overflow:hidden}.bar{height:100%;background:var(--p);width:0}.row{display:flex;justify-content:space-between;gap:12px;margin-top:8px}
-    table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:11px;border-bottom:1px solid #edf0ee} th{font-size:12px;color:var(--muted);text-transform:uppercase}
+    table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:11px;border-bottom:1px solid #edf0ee;vertical-align:top} th{font-size:12px;color:var(--muted);text-transform:uppercase}
     input,button{font:inherit;padding:11px 13px;border-radius:10px;border:1px solid #d8dfdb}button{background:var(--p);color:#fff;border:0;cursor:pointer}.login{max-width:420px;margin:12vh auto}
-    .hide{display:none}.pill{display:inline-block;border-radius:999px;padding:3px 8px;background:#edf7f2;color:var(--p);font-size:12px}.warn{color:var(--warn)}
+    .hide{display:none}.pill{display:inline-block;border-radius:999px;padding:3px 8px;background:#edf7f2;color:var(--p);font-size:12px}.pill.pending{background:#fff4e5;color:var(--warn)}.pill.out{background:#fef3f2;color:var(--red)}.pill.in{background:#eff6ff;color:var(--blue)}.warn{color:var(--warn)}
     @media(max-width:760px){.grid{grid-template-columns:1fr 1fr}.wrap{padding:16px} table{font-size:13px}.scroll{overflow:auto}}
   </style>
 </head>
@@ -23,19 +23,20 @@
     <p id="err" class="warn"></p>
   </div>
   <main id="app" class="wrap hide">
-    <div class="top"><div><h1 id="campaign">Campaign</h1><div class="muted">Live collector dashboard</div></div><button onclick="load()">Refresh</button></div>
+    <div class="top"><div><h1 id="campaign">Campaign</h1><div class="muted">All UPI transactions are tracked. Only transactions marked Donation count toward fundraising.</div></div><button onclick="load()">Refresh</button></div>
     <div class="grid">
-      <div class="card"><div class="muted">Detected total</div><div id="total" class="big">₹0</div></div>
-      <div class="card"><div class="muted">Reconciled</div><div id="reconciled" class="big">₹0</div></div>
-      <div class="card"><div class="muted">Payments</div><div id="count" class="big">0</div></div>
-      <div class="card"><div class="muted">Names pending</div><div id="pending" class="big">0</div></div>
+      <div class="card"><div class="muted">Donation total</div><div id="donationTotal" class="big">₹0</div></div>
+      <div class="card"><div class="muted">Transactions tracked</div><div id="transactionCount" class="big">0</div></div>
+      <div class="card"><div class="muted">Incoming / Outgoing</div><div id="flowCount" class="big">0 / 0</div></div>
+      <div class="card"><div class="muted">Needs review</div><div id="pendingReviews" class="big">0</div></div>
     </div>
     <section class="card">
       <div class="row"><strong>Fundraising progress</strong><span id="progressText"></span></div>
       <div class="progress" style="margin-top:12px"><div id="bar" class="bar"></div></div>
+      <div class="muted" style="margin-top:8px">Reconciled donations: <span id="reconciled"></span></div>
     </section>
-    <section class="card" style="margin-top:14px"><h2>Collectors</h2><div class="scroll"><table><thead><tr><th>Collector</th><th>Payments</th><th>Detected</th></tr></thead><tbody id="collectors"></tbody></table></div></section>
-    <section class="card" style="margin-top:14px"><h2>Recent payments</h2><div class="scroll"><table><thead><tr><th>Time</th><th>Collector</th><th>Donor</th><th>Amount</th><th>Status</th></tr></thead><tbody id="recent"></tbody></table></div></section>
+    <section class="card" style="margin-top:14px"><h2>Collectors</h2><div class="scroll"><table><thead><tr><th>Collector</th><th>Transactions</th><th>Donations</th><th>Donation amount</th></tr></thead><tbody id="collectors"></tbody></table></div></section>
+    <section class="card" style="margin-top:14px"><h2>Recent transactions</h2><div class="scroll"><table><thead><tr><th>Time</th><th>Collector</th><th>Direction</th><th>Party / Donor</th><th>Amount</th><th>Classification</th></tr></thead><tbody id="recent"></tbody></table></div></section>
   </main>
 <script>
   let currentPin = '';
@@ -47,10 +48,22 @@
   }
   function render(d){
     document.getElementById('login').classList.add('hide'); document.getElementById('app').classList.remove('hide');
-    campaign.textContent=d.campaign; total.textContent=money(d.total); reconciled.textContent=money(d.reconciled); count.textContent=d.count; pending.textContent=d.pendingNames;
-    progressText.textContent=`${money(d.total)} / ${money(d.target)}`; bar.style.width=Math.min(100,(d.total/d.target)*100)+'%';
-    collectors.innerHTML=d.byCollector.map(c=>`<tr><td><b>${esc(c.name)}</b><br><span class="muted">${esc(c.code)}</span></td><td>${c.count}</td><td>${money(c.amount)}</td></tr>`).join('');
-    recent.innerHTML=d.recent.map(r=>`<tr><td>${new Date(r.receivedAt).toLocaleString()}</td><td>${esc(r.collector)}</td><td>${esc(r.donor)}</td><td><b>${money(r.amount)}</b></td><td><span class="pill">${r.reconciled?'Reconciled':'Auto-detected'}</span></td></tr>`).join('');
+    campaign.textContent=d.campaign;
+    donationTotal.textContent=money(d.donationTotal);
+    transactionCount.textContent=d.transactionCount;
+    flowCount.textContent=`${d.incomingCount} / ${d.outgoingCount}`;
+    pendingReviews.textContent=d.pendingReviews;
+    reconciled.textContent=money(d.reconciledDonations);
+    progressText.textContent=`${money(d.donationTotal)} / ${money(d.target)}`;
+    bar.style.width=Math.min(100,(d.donationTotal/d.target)*100)+'%';
+    collectors.innerHTML=d.byCollector.map(c=>`<tr><td><b>${esc(c.name)}</b><br><span class="muted">${esc(c.code)}</span></td><td>${c.transactionCount}</td><td>${c.donationCount}</td><td>${money(c.donationAmount)}</td></tr>`).join('');
+    recent.innerHTML=d.recent.map(r=>{
+      const dir = r.direction==='OUTGOING' ? '<span class="pill out">Outgoing</span>' : '<span class="pill in">Incoming</span>';
+      const cls = r.donationStatus==='DONATION' ? '<span class="pill">Donation</span>' : r.donationStatus==='PENDING' ? '<span class="pill pending">Review pending</span>' : '<span class="pill">Not donation</span>';
+      const party = r.donor || r.party || '—';
+      const sign = r.direction==='OUTGOING' ? '−' : '+';
+      return `<tr><td>${new Date(r.transactionAt).toLocaleString()}</td><td>${esc(r.collector)}</td><td>${dir}</td><td>${esc(party)}</td><td><b>${sign}${money(r.amount)}</b></td><td>${cls}</td></tr>`;
+    }).join('');
   }
   function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 </script>

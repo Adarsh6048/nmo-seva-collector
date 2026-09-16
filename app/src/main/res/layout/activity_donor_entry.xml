@@ -49,7 +49,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Is this incoming payment a donation?"
+            android:text="Review this transaction"
             android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -68,19 +68,29 @@
             android:layout_height="wrap_content"
             android:text="Anonymous donor" />
 
+        <EditText
+            android:id="@+id/expenseInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:hint="Expense comment, e.g. medicines / transport / printing"
+            android:inputType="textCapSentences|textMultiLine"
+            android:minLines="2"
+            android:visibility="gone" />
+
         <Button
             android:id="@+id/saveButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
-            android:text="Mark as donation" />
+            android:text="Save classification" />
 
         <Button
             android:id="@+id/notDonationButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Not a donation" />
+            android:text="Personal / not campaign" />
 
         <Button
             android:id="@+id/laterButton"

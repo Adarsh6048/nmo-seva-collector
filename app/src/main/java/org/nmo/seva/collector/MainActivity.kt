@@ -92,7 +92,12 @@ class MainActivity : AppCompatActivity() {
                 DonationStatus.NOT_DONATION -> "not donation"
                 DonationStatus.PENDING -> "review pending"
             }
-            row.findViewById<TextView>(R.id.rowMeta).text = "$directionLabel • $donationLabel • ${p.sourceApp} • ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(p.receivedAt))}${if (p.synced) " • synced" else " • sync pending"}"
+            val storageLabel = if (p.donationStatus == DonationStatus.DONATION) {
+                if (p.synced) "campaign synced" else "campaign sync pending"
+            } else {
+                "local only"
+            }
+            row.findViewById<TextView>(R.id.rowMeta).text = "$directionLabel • $donationLabel • ${p.sourceApp} • ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(p.receivedAt))} • $storageLabel"
             if (clickable) row.setOnClickListener {
                 startActivity(Intent(this, DonorEntryActivity::class.java).putExtra("event_id", p.eventId))
             }

@@ -2,36 +2,157 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background">
+    android:background="@color/background"
+    android:fillViewport="true">
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="20dp">
-        <TextView
-            android:layout_width="wrap_content"
+
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Collector setup"
-            android:textColor="@color/text_primary"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/logoImage"
+                android:layout_width="76dp"
+                android:layout_height="76dp"
+                android:background="@drawable/logo_plate_bg"
+                android:contentDescription="NMO logo"
+                android:padding="4dp"
+                android:scaleType="fitCenter" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Collector setup"
+                    android:textColor="@color/text_primary"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="NMO Seva Ledger"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="COLLECTOR IDENTITY"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/nameInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Use the collector code and token created in your Google Sheet backend. No bank login is required."
-            android:textColor="@color/text_secondary" />
-        <EditText android:id="@+id/nameInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:hint="Collector name" android:inputType="textPersonName" />
-        <EditText android:id="@+id/codeInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:hint="Collector code, e.g. NMO01" android:inputType="textCapCharacters" />
-        <EditText android:id="@+id/tokenInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:hint="Collector token" android:inputType="textPassword" />
-        <EditText android:id="@+id/backendInput" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:hint="Apps Script /exec URL" android:inputType="textUri" />
+            android:background="@drawable/input_bg"
+            android:hint="Collector name"
+            android:hintTextColor="@color/text_muted"
+            android:inputType="textPersonName"
+            android:textColor="@color/text_primary" />
+
+        <EditText
+            android:id="@+id/codeInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/input_bg"
+            android:hint="Collector code, e.g. NMO01"
+            android:hintTextColor="@color/text_muted"
+            android:inputType="textCapCharacters"
+            android:textColor="@color/text_primary" />
+
+        <EditText
+            android:id="@+id/tokenInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/input_bg"
+            android:hint="Collector token"
+            android:hintTextColor="@color/text_muted"
+            android:inputType="textPassword"
+            android:textColor="@color/text_primary" />
+
+        <EditText
+            android:id="@+id/backendInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/input_bg"
+            android:hint="Apps Script /exec URL"
+            android:hintTextColor="@color/text_muted"
+            android:inputType="textUri"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="NOTIFICATION READINESS"
+            android:textColor="@color/text_muted"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="For reliable detection, NMO Seva Ledger needs Notification Access and notifications must stay enabled in the payment apps you actually use. Android does not allow this app to silently turn another app's notifications on."
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/notificationAccessButton"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="14dp"
+                android:backgroundTint="@color/primary"
+                android:text="Enable Notification Access"
+                android:textColor="@color/on_primary"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/paymentNotificationsButton"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="@color/surface_soft"
+                android:text="Review payment-app notifications"
+                android:textColor="@color/text_primary" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
             android:background="@drawable/card_bg"
-            android:text="Ledger notice: when Notification Access is enabled, detected transaction metadata from supported UPI apps (incoming and outgoing amount, time, direction, source app and available counterparty/reference fields) is synced to the campaign ledger. Raw notification text, UPI PINs, bank passwords, SMS and contacts are not collected."
+            android:text="Ledger notice: detected transaction metadata from supported payment apps (incoming/outgoing amount, time, direction, source app and available counterparty/reference fields) is synced to the campaign ledger after setup. Raw notification text, UPI PINs, bank passwords, SMS and contacts are not collected."
             android:textColor="@color/text_primary"
             android:textSize="13sp" />
 
@@ -40,8 +161,19 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="I understand and agree to this transaction-ledger sync for campaign accounting." />
+            android:buttonTint="@color/primary"
+            android:text="I understand and agree to transaction-ledger sync for campaign accounting."
+            android:textColor="@color/text_primary" />
 
-        <Button android:id="@+id/saveButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="Save setup" />
+        <Button
+            android:id="@+id/saveButton"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="18dp"
+            android:layout_marginBottom="24dp"
+            android:backgroundTint="@color/primary"
+            android:text="Save collector setup"
+            android:textColor="@color/on_primary"
+            android:textStyle="bold" />
     </LinearLayout>
 </ScrollView>

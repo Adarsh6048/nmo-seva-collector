@@ -34,9 +34,7 @@ class UpiNotificationListenerService : NotificationListenerService() {
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
 
-        // Some UPI apps (including PhonePe versions) spread one visible message across
-        // title/text/subtext/expanded-text fields. Collect the useful visible fields so
-        // the parser can reconstruct messages such as "XYZ sent Rs.1 to you".
+        // UPI apps may split one visible message across several Android notification fields.
         val extraParts = buildList<String> {
             extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.let(::add)
             extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.let(::add)
@@ -57,6 +55,11 @@ class UpiNotificationListenerService : NotificationListenerService() {
         } else {
             DonationStatus.NOT_DONATION
         }
+        val expenseStatus = if (parsed.direction == TransactionDirection.OUTGOING) {
+            ExpenseStatus.PENDING
+        } else {
+            ExpenseStatus.NOT_APPLICABLE
+        }
 
         val db = PaymentDbHelper(applicationContext)
         val inserted = db.insertIfNew(
@@ -70,19 +73,25 @@ class UpiNotificationListenerService : NotificationListenerService() {
                 sourceApp = sourceName,
                 direction = parsed.direction,
                 donationStatus = donationStatus,
-                // New transactions stay local until the collector marks an incoming one as Donation.
-                synced = true,
+                expenseStatus = expenseStatus,
+                expenseNote = null,
+                // Every detected transaction is queued for the transparent central ledger.
+                synced = false,
                 reconciled = false
             )
         )
         if (!inserted) return
 
-        if (parsed.direction == TransactionDirection.INCOMING) {
-            promptForClassification(eventId, parsed.amount, sourceName)
-        }
+        SyncScheduler.enqueue(applicationContext)
+        promptForReview(eventId, parsed.amount, sourceName, parsed.direction)
     }
 
-    private fun promptForClassification(eventId: String, amount: Double, source: String) {
+    private fun promptForReview(
+        eventId: String,
+        amount: Double,
+        source: String,
+        direction: TransactionDirection
+    ) {
         val intent = Intent(this, DonorEntryActivity::class.java).apply {
             putExtra("event_id", eventId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -94,10 +103,16 @@ class UpiNotificationListenerService : NotificationListenerService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val formatted = if (amount % 1.0 == 0.0) "₹${amount.toLong()}" else "₹%.2f".format(amount)
+        val title = if (direction == TransactionDirection.INCOMING) "$formatted received" else "$formatted sent"
+        val message = if (direction == TransactionDirection.INCOMING) {
+            "Tap to mark donation or personal payment • $source"
+        } else {
+            "Tap to mark campaign expense or personal payment • $source"
+        }
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_medical)
-            .setContentTitle("$formatted received")
-            .setContentText("Tap to mark this as donation or personal payment • $source")
+            .setContentTitle(title)
+            .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)

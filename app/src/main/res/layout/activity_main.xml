@@ -34,7 +34,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Detected on this phone"
+                android:text="Donation total on this phone"
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
             <TextView
@@ -87,7 +87,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Needs donor name"
+            android:text="Needs donation review"
             android:textColor="@color/text_primary"
             android:textSize="19sp"
             android:textStyle="bold" />
@@ -102,7 +102,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Recent payments"
+            android:text="Recent transactions"
             android:textColor="@color/text_primary"
             android:textSize="19sp"
             android:textStyle="bold" />
@@ -118,7 +118,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="24dp"
-            android:text="Privacy: the app filters selected UPI apps and saves only payment fields. It does not request a UPI PIN, bank password, SMS access, contacts, or accessibility permission."
+            android:text="Privacy: the app reads notifications only from supported UPI apps, tracks transaction fields, and lets the collector decide which incoming payments are donations. It does not request a UPI PIN, bank password, SMS access, contacts, or accessibility permission."
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
     </LinearLayout>

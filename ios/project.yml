@@ -1,0 +1,32 @@
+name: NMOSevaLedger
+options:
+  bundleIdPrefix: org.nmo.seva
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+targets:
+  NMOSevaLedger:
+    type: application
+    platform: iOS
+    sources:
+      - NMOSevaLedger
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.nmo.seva.ledger
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: NMO Seva Ledger
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+    dependencies:
+      - target: NMOShareExtension
+  NMOShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - NMOShareExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.nmo.seva.ledger.share
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.share-services
+        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+        INFOPLIST_KEY_NSExtension_NSExtensionAttributes_NSExtensionActivationRule: TRUEPREDICATE

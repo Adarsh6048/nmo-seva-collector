@@ -5,17 +5,18 @@ Android collector app + Google Sheets / Apps Script backend for tracking UPI tra
 ## What this version does
 
 1. Android's Notification Listener watches supported UPI apps on the collector phone.
-2. Incoming and outgoing transaction notifications are detected and stored locally.
+2. Incoming and outgoing transaction notifications are detected and stored in the phone's local SQLite ledger.
 3. Every transaction is tagged as `INCOMING` or `OUTGOING`.
-4. Outgoing transactions are kept in the ledger but automatically classified as `NOT_DONATION`.
+4. Outgoing transactions stay local and are automatically classified as `NOT_DONATION`.
 5. Incoming transactions start as `PENDING` and the collector gets a prompt such as **“₹500 received — tap to mark as donation or personal payment.”**
 6. The collector can choose:
    - **Mark as donation** → enter donor name or choose Anonymous
    - **Not a donation** → personal/non-campaign payment
    - **Decide later**
 7. Only transactions classified as `DONATION` count toward the ₹4 lakh fundraising total.
-8. WorkManager syncs records to Google Sheets when internet is available; offline transactions remain queued locally.
-9. The central dashboard shows donation totals separately from the complete incoming/outgoing transaction ledger.
+8. Personal, pending and outgoing transactions remain on the collector's phone and are **not uploaded to the central Google Sheet**.
+9. Donations sync through WorkManager when internet is available. If an already-uploaded donation is later reclassified as not a donation, that change is synced so the central total is corrected.
+10. The central dashboard contains campaign donation records, not the collector's full personal transaction history.
 
 No UPI PIN, bank password, SMS access, contacts permission or accessibility permission is requested.
 
@@ -45,12 +46,12 @@ The package allow-list lives in `UpiNotificationListenerService.kt`. Notificatio
 - Notification Access enabled by each collector
 - On Android 13+, normal notification permission so the donation-review prompt can be shown
 
-## Transaction fields synced
+## Donation fields synced to the campaign backend
 
 - event fingerprint
 - amount
-- direction: `INCOMING` / `OUTGOING`
-- donation status: `PENDING` / `DONATION` / `NOT_DONATION`
+- direction
+- donation status
 - donor name when marked as donation
 - optional counterparty hint parsed from the notification
 - optional UPI/reference ID when present

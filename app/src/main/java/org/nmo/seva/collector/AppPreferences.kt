@@ -25,8 +25,13 @@ class AppPreferences(context: Context) {
         get() = prefs.getBoolean("ledger_consent", false)
         set(value) = prefs.edit().putBoolean("ledger_consent", value).apply()
 
+    var notificationReadinessAcknowledged: Boolean
+        get() = prefs.getBoolean("notification_readiness_ack", false)
+        set(value) = prefs.edit().putBoolean("notification_readiness_ack", value).apply()
+
     fun isConfigured(): Boolean = collectorCode.isNotBlank() &&
         collectorToken.isNotBlank() &&
         backendUrl.startsWith("https://") &&
-        ledgerConsent
+        ledgerConsent &&
+        notificationReadinessAcknowledged
 }

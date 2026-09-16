@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">NMO Seva Collector</string>
+    <string name="channel_name">Payment follow-up</string>
+    <string name="channel_desc">Prompts collectors to add a donor name after an incoming UPI payment is detected.</string>
+</resources>

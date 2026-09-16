@@ -16,6 +16,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: NMO Seva Ledger
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        CODE_SIGN_ENTITLEMENTS: NMOSevaLedger/NMOSevaLedger.entitlements
     dependencies:
       - target: NMOShareExtension
   NMOShareExtension:
@@ -30,3 +31,4 @@ targets:
         INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.share-services
         INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
         INFOPLIST_KEY_NSExtension_NSExtensionAttributes_NSExtensionActivationRule: TRUEPREDICATE
+        CODE_SIGN_ENTITLEMENTS: NMOShareExtension/NMOShareExtension.entitlements

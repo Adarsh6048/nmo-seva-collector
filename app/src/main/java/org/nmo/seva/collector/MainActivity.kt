@@ -52,19 +52,19 @@ class MainActivity : AppCompatActivity() {
     private fun refresh() {
         binding.collectorText.text = if (prefs.collectorCode.isBlank()) "Not configured" else "${prefs.collectorName.ifBlank { "Collector" }} • ${prefs.collectorCode}"
         val donationTotal = db.donationTotal()
+        val expenseTotal = db.campaignExpenseTotal()
         val count = db.transactionCount()
-        val incoming = db.incomingCount()
-        val pending = db.getPendingClassification(100).size
+        val pending = db.getPendingReview(100).size
         binding.totalText.text = rupees(donationTotal)
-        binding.statsText.text = "$count transactions tracked • $incoming incoming • $pending awaiting donation review"
+        binding.statsText.text = "$count transactions in ledger • ${rupees(expenseTotal)} campaign expenses • $pending awaiting review"
 
         val enabled = NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
         binding.accessWarning.visibility = if (enabled) View.GONE else View.VISIBLE
         binding.accessWarning.text = "Notification access is OFF. UPI transaction notifications cannot be detected until you enable it."
         binding.notificationAccessButton.text = if (enabled) "Notification access enabled" else "Enable notification access"
 
-        renderPayments(binding.pendingContainer, db.getPendingClassification(10), clickable = true)
-        renderPayments(binding.recentContainer, db.getRecent(20), clickable = true)
+        renderPayments(binding.pendingContainer, db.getPendingReview(12), clickable = true)
+        renderPayments(binding.recentContainer, db.getRecent(25), clickable = true)
     }
 
     private fun renderPayments(container: android.widget.LinearLayout, items: List<Payment>, clickable: Boolean) {
@@ -81,23 +81,39 @@ class MainActivity : AppCompatActivity() {
         items.forEach { p ->
             val row = LayoutInflater.from(this).inflate(R.layout.payment_row, container, false)
             row.findViewById<TextView>(R.id.rowAmount).text = if (p.direction == TransactionDirection.INCOMING) "+${rupees(p.amount)}" else "−${rupees(p.amount)}"
-            row.findViewById<TextView>(R.id.rowName).text = when (p.donationStatus) {
-                DonationStatus.DONATION -> p.donorName?.takeIf { it.isNotBlank() } ?: "Donation"
-                DonationStatus.NOT_DONATION -> if (p.direction == TransactionDirection.OUTGOING) "Outgoing transaction" else "Not a donation"
-                DonationStatus.PENDING -> "Tap to classify donation"
-            }
-            val directionLabel = if (p.direction == TransactionDirection.INCOMING) "incoming" else "outgoing"
-            val donationLabel = when (p.donationStatus) {
-                DonationStatus.DONATION -> "donation"
-                DonationStatus.NOT_DONATION -> "not donation"
-                DonationStatus.PENDING -> "review pending"
-            }
-            val storageLabel = if (p.donationStatus == DonationStatus.DONATION) {
-                if (p.synced) "campaign synced" else "campaign sync pending"
+
+            row.findViewById<TextView>(R.id.rowName).text = if (p.direction == TransactionDirection.INCOMING) {
+                when (p.donationStatus) {
+                    DonationStatus.DONATION -> p.donorName?.takeIf { it.isNotBlank() } ?: "Donation"
+                    DonationStatus.NOT_DONATION -> "Personal incoming payment"
+                    DonationStatus.PENDING -> "Review: donation or personal?"
+                }
             } else {
-                "local only"
+                when (p.expenseStatus) {
+                    ExpenseStatus.CAMPAIGN_EXPENSE -> p.expenseNote?.takeIf { it.isNotBlank() } ?: "Campaign expense"
+                    ExpenseStatus.PERSONAL -> "Personal outgoing payment"
+                    ExpenseStatus.PENDING -> "Review: campaign expense or personal?"
+                    ExpenseStatus.NOT_APPLICABLE -> "Outgoing transaction"
+                }
             }
-            row.findViewById<TextView>(R.id.rowMeta).text = "$directionLabel • $donationLabel • ${p.sourceApp} • ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(p.receivedAt))} • $storageLabel"
+
+            val directionLabel = if (p.direction == TransactionDirection.INCOMING) "incoming" else "outgoing"
+            val classification = if (p.direction == TransactionDirection.INCOMING) {
+                when (p.donationStatus) {
+                    DonationStatus.DONATION -> "donation"
+                    DonationStatus.NOT_DONATION -> "personal"
+                    DonationStatus.PENDING -> "review pending"
+                }
+            } else {
+                when (p.expenseStatus) {
+                    ExpenseStatus.CAMPAIGN_EXPENSE -> "campaign expense"
+                    ExpenseStatus.PERSONAL -> "personal"
+                    ExpenseStatus.PENDING -> "expense review pending"
+                    ExpenseStatus.NOT_APPLICABLE -> "outgoing"
+                }
+            }
+            val syncLabel = if (p.synced) "ledger synced" else "ledger sync pending"
+            row.findViewById<TextView>(R.id.rowMeta).text = "$directionLabel • $classification • ${p.sourceApp} • ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(p.receivedAt))} • $syncLabel"
             if (clickable) row.setOnClickListener {
                 startActivity(Intent(this, DonorEntryActivity::class.java).putExtra("event_id", p.eventId))
             }

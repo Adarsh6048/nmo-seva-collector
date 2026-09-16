@@ -18,6 +18,8 @@ object ApiClient {
                 put("transactionRef", p.transactionRef ?: JSONObject.NULL)
                 put("receivedAt", p.receivedAt)
                 put("sourceApp", p.sourceApp)
+                put("direction", p.direction.name)
+                put("donationStatus", p.donationStatus.name)
                 put("reconciled", p.reconciled)
             })
         }

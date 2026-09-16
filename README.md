@@ -38,6 +38,10 @@ The collector is shown a ledger notice during setup. The app does not request a 
 - PhonePe — `com.phonepe.app`
 - Paytm — `net.one97.paytm`
 - BHIM — `in.org.npci.upiapp`
+- WhatsApp Pay — `com.whatsapp`
+- WhatsApp Business Pay — `com.whatsapp.w4b`
+
+WhatsApp requires stricter parsing because ordinary chat notifications come from the same Android package as WhatsApp Pay. The parser therefore accepts only payment-like WhatsApp notification formats such as `You received ₹500 from Name` or explicit payment-received/sent wording. If a collector's WhatsApp version uses different wording, capture the visible notification text with sensitive details hidden and add a matching rule before relying on it.
 
 The package allow-list lives in `UpiNotificationListenerService.kt`. Notification wording differs between versions, so parser rules should be tested against real notifications used by collectors.
 

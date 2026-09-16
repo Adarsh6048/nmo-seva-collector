@@ -67,7 +67,7 @@
             android:layout_marginTop="8dp"
             android:background="@drawable/input_bg"
             android:hint="Collector name"
-            android:hintTextColor="@color/text_muted"
+            android:textColorHint="@color/text_muted"
             android:inputType="textPersonName"
             android:textColor="@color/text_primary" />
 
@@ -78,7 +78,7 @@
             android:layout_marginTop="10dp"
             android:background="@drawable/input_bg"
             android:hint="Collector code, e.g. NMO01"
-            android:hintTextColor="@color/text_muted"
+            android:textColorHint="@color/text_muted"
             android:inputType="textCapCharacters"
             android:textColor="@color/text_primary" />
 
@@ -89,7 +89,7 @@
             android:layout_marginTop="10dp"
             android:background="@drawable/input_bg"
             android:hint="Collector token"
-            android:hintTextColor="@color/text_muted"
+            android:textColorHint="@color/text_muted"
             android:inputType="textPassword"
             android:textColor="@color/text_primary" />
 
@@ -100,7 +100,7 @@
             android:layout_marginTop="10dp"
             android:background="@drawable/input_bg"
             android:hint="Apps Script /exec URL"
-            android:hintTextColor="@color/text_muted"
+            android:textColorHint="@color/text_muted"
             android:inputType="textUri"
             android:textColor="@color/text_primary" />
 
